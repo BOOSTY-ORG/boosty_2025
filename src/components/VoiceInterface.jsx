@@ -3,7 +3,6 @@ import { X, Mic, Settings } from "lucide-react";
 import { useSolarAssistant } from "../context/SolarAssistantContext";
 import { useWebSpeech } from "../services/WebSpeechService";
 
-
 const VoiceInterface = () => {
   const { state, actions, t } = useSolarAssistant();
   const { isListening, transcript } = state;
@@ -59,11 +58,11 @@ const VoiceInterface = () => {
   };
 
   return (
-    <div className="fixed inset-0 bg-yellow-400 flex flex-col items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 bg-boosty_yellow flex flex-col items-center justify-center p-4 z-50">
       <div className="absolute top-4 right-4">
         <button
           onClick={() => actions.setView("settings")}
-          className="bg-yellow-500 hover:bg-yellow-600 text-gray-700 rounded-full p-2 transition-colors"
+          className="bg-yellow-500 hover:bg-boosty_yellow text-gray-700 rounded-full p-2 transition-colors"
           aria-label="Settings"
         >
           <Settings size={24} />
@@ -77,7 +76,7 @@ const VoiceInterface = () => {
             {barHeights.map((height, index) => (
               <div
                 key={index}
-                className="bg-yellow-600 w-2 rounded-full transition-all duration-200 ease-in-out"
+                className="bg-boosty_yellow w-2 rounded-full transition-all duration-200 ease-in-out"
                 style={{ height: `${height}px` }}
               />
             ))}
@@ -89,7 +88,7 @@ const VoiceInterface = () => {
       <div className="flex space-x-4 mt-8">
         <button
           onClick={handleCloseClick}
-          className="bg-yellow-500 hover:bg-yellow-600 rounded-full p-4 transition-colors"
+          className="bg-boosty_yellow hover:bg-boosty_yellow/80 rounded-full p-4 transition-colors"
           aria-label="Cancel"
         >
           <X size={24} className="text-gray-800" />
@@ -98,8 +97,8 @@ const VoiceInterface = () => {
           onClick={isListening ? stopListening : startListening}
           className={`${
             isListening
-              ? "bg-yellow-600 animate-pulse"
-              : "bg-yellow-500 hover:bg-yellow-600"
+              ? "bg-boosty_yellow animate-pulse"
+              : "bg-boosty_yellow/80 hover:bg-boosty_yellow"
           } rounded-full p-4 transition-colors`}
           aria-label={isListening ? "Listening..." : "Start listening"}
         >
@@ -131,7 +130,7 @@ const VoiceInterface = () => {
           </ul>
           <div className="mt-4 flex justify-end">
             <button
-              className="bg-gray-800 text-yellow-400 px-4 py-2 rounded-full hover:bg-gray-700 transition-colors"
+              className="bg-gray-800 text-boosty_yellow px-4 py-2 rounded-full hover:bg-gray-700 transition-colors"
               onClick={() => actions.setView("systemSelection")}
             >
               Confirm Details

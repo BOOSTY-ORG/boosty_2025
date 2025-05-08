@@ -6,7 +6,8 @@ const LandingComponent = ({ variant }) => {
   const { actions, t } = useSolarAssistant();
 
   const handleStartClick = () => {
-    actions.setView("voiceSelection");
+    // Skip the voice selection screen and go directly to voice interface
+    actions.setView("voice");
   };
 
   // Different button texts based on the variant
@@ -14,7 +15,7 @@ const LandingComponent = ({ variant }) => {
     variant === "friendly" ? "Talk to me, my friend" : t.tapHereToTalk;
 
   return (
-    <div className="bg-white min-w-[460px] min-h-[153.99px] max-w-lg h-auto rounded-3xl p-4 md:p-6 flex items-center justify-between gap-3 md:gap-6 shadow-md">
+    <div className="bg-white w-full lg:min-w-[460px] min-h-[153.99px] max-w-lg h-auto rounded-3xl p-4 md:p-6 flex items-center justify-between gap-3 md:gap-6 shadow-md">
       <div className="flex items-center">
         <img
           src="/boosty.gif"

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useSolarAssistant } from "../context/SolarAssistantContext";
 import { useWebSpeech } from "../services/WebSpeechService";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -25,6 +25,10 @@ const VoiceSelectionScreen = () => {
   const { state, actions, t } = useSolarAssistant();
   const { selectedVoice, language } = state;
   const { speak } = useWebSpeech();
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [animationTime, setAnimationTime] = useState(Date.now());
+
+  const animationFrameRef = useRef(null);
 
   // Voice options with their properties
   const voices = [
@@ -33,7 +37,7 @@ const VoiceSelectionScreen = () => {
     { id: "lucky", name: "Lucky", mood: "Lively" },
   ];
 
-  // Handle voice selection
+  // Function to handle voice selection AND animation
   const handleVoiceSelect = (voiceId) => {
     actions.setVoice(voiceId);
 
@@ -43,24 +47,54 @@ const VoiceSelectionScreen = () => {
       pidgin: `This na the ${voiceId} voice. You like am?`,
     }[language];
 
-    speak(sampleText);
+    // Start the animation
+    setIsAnimating(true);
+
+    // Speak the text
+    speak(sampleText, voiceId);
+
+    // Set a timeout to stop the animation when speech ends
+    const estimatedDuration = sampleText.length * 100; // ~100ms per character
+    setTimeout(() => {
+      setIsAnimating(false);
+    }, estimatedDuration);
   };
+
+  // Add this effect for continuous animation
+  useEffect(() => {
+    const animate = () => {
+      // Force a re-render to update the wave heights
+      setAnimationTime(Date.now());
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    // Only run animation when isAnimating is true
+    if (isAnimating) {
+      animationFrameRef.current = requestAnimationFrame(animate);
+    }
+
+    // Cleanup function to cancel animation
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [isAnimating]);
 
   // Handle language change
   const handleLanguageChange = (newLanguage) => {
     actions.setLanguage(newLanguage);
   };
 
-  // Handle Done button click
   const handleDone = () => {
     actions.setView("voice");
   };
 
-  // Handle Cancel button click
   const handleCancel = () => {
-    actions.setView("landing");
+    actions.setView("voice");
   };
 
+  // Navigation functions
   const handlePreviousVoice = () => {
     const currentIndex = voices.findIndex(
       (voice) => voice.id === selectedVoice
@@ -69,7 +103,6 @@ const VoiceSelectionScreen = () => {
     handleVoiceSelect(voices[prevIndex].id);
   };
 
-  // Function to handle navigating to the next voice
   const handleNextVoice = () => {
     const currentIndex = voices.findIndex(
       (voice) => voice.id === selectedVoice
@@ -105,25 +138,33 @@ const VoiceSelectionScreen = () => {
           </button>
         </div>
       </div>
-
       <h2 className="text-2xl font-bold text-center mb-8">{t.chooseVoice}</h2>
-
       {/* Voice visualization icon - Updated with varying heights */}
-      <div className="bg-white rounded-full w-[202px] h-[202px] mb-12 flex items-center justify-center shadow-lg">
+      <div className="bg-white rounded-full w-[202px] h-[202px] mb-12 flex items-center justify-center shadow-lg shadow-slate-50">
         <div className="flex items-center space-x-1">
-          {[22, 34, 42, 56, 42, 34, 22].map((height, index) => (
-            <div
-              key={index}
-              className="bg-yellow-600 w-2 rounded-full"
-              style={{
-                height: `${height}px`,
-                margin: "0 2px",
-              }}
-            />
-          ))}
+          {[22, 34, 50, 69, 50, 34, 22].map((height, index) => {
+            // Store the base height as a constant
+            const baseHeight = height;
+
+            // Calculate animated height only when animating
+            const animatedHeight = isAnimating
+              ? baseHeight +
+                Math.sin(Date.now() / 200 + index) * (baseHeight * 0.4)
+              : baseHeight;
+
+            return (
+              <div
+                key={index}
+                className="bg-[#B78A16] w-2 rounded-full transition-all duration-100"
+                style={{
+                  height: `${animatedHeight}px`,
+                  margin: "0 2px",
+                }}
+              />
+            );
+          })}
         </div>
       </div>
-
       {/* Voice options carousel */}
       <div className="flex items-center justify-between w-full lg:w-[50%] mb-16 px-[10px]">
         <button
@@ -161,7 +202,6 @@ const VoiceSelectionScreen = () => {
           />
         </button>
       </div>
-
       {/* Action buttons */}
       <div className="flex space-x-8">
         <button

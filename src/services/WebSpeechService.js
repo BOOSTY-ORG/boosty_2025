@@ -1,246 +1,230 @@
-import { useSolarAssistant } from "../context/SolarAssistantContext";
+import { useState, useEffect, useCallback } from "react";
 
 export const useWebSpeech = () => {
-  const { state, actions } = useSolarAssistant();
-  const { language, isListening } = state;
+  const [voices, setVoices] = useState([]);
+  const [speechSynthesis, setSpeechSynthesis] = useState(null);
+  const [isListening, setIsListening] = useState(false);
+  const [transcript, setTranscript] = useState("");
+  const [recognition, setRecognition] = useState(null);
 
-  // Map our app languages to Web Speech API language codes
-  const getLanguageCode = () => {
-    switch (language) {
-      case "pidgin":
-        // Web Speech API doesn't support Pidgin directly, use Nigerian English
-        return "en-NG";
-      case "english":
+  useEffect(() => {
+    // Access the speech synthesis API
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      setSpeechSynthesis(window.speechSynthesis);
+
+      // Load available voices
+      const loadVoices = () => {
+        const availableVoices = window.speechSynthesis.getVoices();
+        setVoices(availableVoices);
+      };
+
+      // Load voices right away if they're already available
+      loadVoices();
+
+      // Chrome loads voices asynchronously
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+
+      // Set up speech recognition
+      if (
+        "webkitSpeechRecognition" in window ||
+        "SpeechRecognition" in window
+      ) {
+        const SpeechRecognition =
+          window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognitionInstance = new SpeechRecognition();
+        recognitionInstance.continuous = false;
+        recognitionInstance.interimResults = true;
+        recognitionInstance.lang = "en-US";
+
+        recognitionInstance.onresult = (event) => {
+          const current = event.resultIndex;
+          const result = event.results[current];
+          const transcriptText = result[0].transcript;
+          console.log("Speech recognized:", transcriptText);
+          setTranscript(transcriptText);
+        };
+
+        recognitionInstance.onerror = (event) => {
+          console.error("Recognition error:", event.error);
+        };
+
+        recognitionInstance.onend = () => {
+          console.log("Recognition ended");
+          setIsListening(false);
+        };
+
+        setRecognition(recognitionInstance);
+      }
+    }
+  }, []);
+
+  // Configure different voice profiles based on the selected voice option
+  const getVoiceConfig = (voiceId) => {
+    // Default configuration
+    const config = {
+      voice: null, // Will be set based on available system voices
+      rate: 1.0, // Normal speech rate
+      pitch: 1.0, // Normal pitch
+      volume: 1.0, // Full volume
+    };
+
+    // Customize based on selected voice with more pronounced differences
+    switch (voiceId) {
+      case "sonny":
+        // Very calm, slow, deep voice
+        config.rate = 0.85;
+        config.pitch = 0.7;
+        break;
+      case "bright":
+        // More energetic, faster, medium-high pitch
+        config.rate = 1.15;
+        config.pitch = 1.3;
+        break;
+      case "lucky":
+        // Very lively, fastest, highest pitch
+        config.rate = 1.3;
+        config.pitch = 1.4;
+        break;
       default:
-        return "en-NG"; // Nigerian English
+        // Default - use bright settings
+        config.rate = 1.15;
+        config.pitch = 1.3;
+        break;
     }
-  };
 
-  /**
-   * Start voice recognition using Web Speech API
-   */
-  const startListening = async () => {
-    // Don't start if already listening
-    if (isListening) return;
+    // Select a voice based on the voice ID
+    if (voices.length > 0) {
+      // Try to select distinctly different voices if available
+      switch (voiceId) {
+        case "sonny":
+          // Deep male voice for Sonny
+          config.voice =
+            voices.find(
+              (voice) =>
+                voice.name.toLowerCase().includes("male") ||
+                voice.name.toLowerCase().includes("daniel") ||
+                voice.name.toLowerCase().includes("david")
+            ) || voices[0];
+          break;
 
-    try {
-      const SpeechRecognition =
-        window.SpeechRecognition || window.webkitSpeechRecognition;
+        case "bright":
+          // Female voice for Bright
+          config.voice =
+            voices.find(
+              (voice) =>
+                voice.name.toLowerCase().includes("female") ||
+                voice.name.toLowerCase().includes("samantha") ||
+                voice.name.toLowerCase().includes("karen")
+            ) || voices[0];
+          break;
 
-      if (!SpeechRecognition) {
-        console.error("Speech recognition not supported in this browser");
-        // For demo purposes, fall back to mock responses
-        useMockSpeechRecognition();
-        return;
+        case "lucky":
+          // Different accent if possible
+          config.voice =
+            voices.find(
+              (voice) =>
+                voice.lang.includes("en-GB") ||
+                voice.name.toLowerCase().includes("alex") ||
+                voice.name.toLowerCase().includes("victoria")
+            ) || voices[0];
+          break;
       }
 
-      const recognition = new SpeechRecognition();
-
-      recognition.lang = getLanguageCode();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-
-      recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        actions.setTranscript(transcript);
-        processUserSpeech(transcript);
-      };
-
-      recognition.onerror = (event) => {
-        console.error("Web Speech API error:", event.error);
-        actions.setListening(false);
-      };
-
-      recognition.onend = () => {
-        actions.setListening(false);
-      };
-
-      actions.setListening(true);
-      recognition.start();
-    } catch (error) {
-      console.error("Speech recognition failed:", error);
-      actions.setListening(false);
-
-      // Fall back to mock responses for demo purposes
-      useMockSpeechRecognition();
-    }
-  };
-
-  /**
-   * Use mock responses for development/demo purposes
-   */
-  const useMockSpeechRecognition = () => {
-    actions.setListening(true);
-
-    setTimeout(() => {
-      const mockTranscript = getMockTranscript();
-      actions.setTranscript(mockTranscript);
-      processUserSpeech(mockTranscript);
-      actions.setListening(false);
-    }, 2000);
-  };
-
-  /**
-   * Stop listening
-   */
-  const stopListening = () => {
-    actions.setListening(false);
-  };
-
-  /**
-   * Process user speech to detect intents and entities
-   */
-  const processUserSpeech = (transcript) => {
-    // Basic intent recognition for demo purposes
-    const lowerTranscript = transcript.toLowerCase();
-
-    // Check for appliance mentions
-    if (lowerTranscript.includes("freezer")) {
-      actions.addAppliance({
-        id: Date.now().toString(),
-        name: "Freezer",
-        quantity: 1,
-        dayHours: 8,
-        nightHours: 3,
-        wattage: 800,
-      });
-    }
-
-    if (
-      lowerTranscript.includes("tv") ||
-      lowerTranscript.includes("television")
-    ) {
-      actions.addAppliance({
-        id: Date.now().toString(),
-        name: "Television",
-        quantity: 1,
-        dayHours: 6,
-        nightHours: 4,
-        wattage: 120,
-      });
-    }
-
-    if (
-      lowerTranscript.includes("fridge") ||
-      lowerTranscript.includes("refrigerator")
-    ) {
-      actions.addAppliance({
-        id: Date.now().toString(),
-        name: "Refrigerator",
-        quantity: 1,
-        dayHours: 12,
-        nightHours: 12,
-        wattage: 150,
-      });
-    }
-
-    // Check for address information
-    if (
-      lowerTranscript.includes("address") ||
-      lowerTranscript.includes("live")
-    ) {
-      // Extract address (simplified)
-      const addressMatch = transcript.match(
-        /(?:address is|live at|live in) (.*)/i
-      );
-      if (addressMatch && addressMatch[1]) {
-        actions.updateOrderDetails({
-          address: {
-            ...state.orderDetails.address,
-            street: addressMatch[1].trim(),
-          },
-        });
+      // Fallback to any English voice or first voice
+      if (!config.voice) {
+        config.voice =
+          voices.find((voice) => voice.lang.includes("en")) || voices[0];
       }
     }
 
-    // Navigate based on speech
-    if (
-      lowerTranscript.includes("checkout") ||
-      lowerTranscript.includes("pay")
-    ) {
-      actions.setView("checkout");
-    } else if (
-      lowerTranscript.includes("system") ||
-      lowerTranscript.includes("package")
-    ) {
-      actions.setView("systemSelection");
-    }
+    return config;
   };
 
-  /**
-   * Mock function for demo purposes
-   */
-  const getMockTranscript = () => {
-    const mockResponses = [
-      "I want solar for my freezer that runs 8 hours during the day and 3 hours at night",
-      "My address is 123 Lagos Street, Ikeja",
-      "I want to power my TV, AC, and refrigerator",
-      "I have a budget of 3 million naira",
-    ];
+  const speak = useCallback(
+    (text, voiceId = "bright") => {
+      if (!speechSynthesis) return;
 
-    return mockResponses[Math.floor(Math.random() * mockResponses.length)];
-  };
+      // Stop any current speech
+      speechSynthesis.cancel();
 
-  /**
-   * Text to speech function using Web Speech API
-   */
-  const speak = async (text) => {
-    try {
-      if ("speechSynthesis" in window) {
-        const utterance = new SpeechSynthesisUtterance(text);
+      // Create a new utterance
+      const utterance = new SpeechSynthesisUtterance(text);
 
-        // Try to find a Nigerian English voice if available
-        const voices = window.speechSynthesis.getVoices();
+      // Apply voice configuration based on selected voice
+      const voiceConfig = getVoiceConfig(voiceId);
 
-        // Select voice based on user preference and available system voices
-        let voice;
+      utterance.voice = voiceConfig.voice;
+      utterance.rate = voiceConfig.rate;
+      utterance.pitch = voiceConfig.pitch;
+      utterance.volume = voiceConfig.volume;
 
-        // Try to find a Nigerian English voice first
-        voice = voices.find((v) => v.lang === "en-NG");
-
-        // If no Nigerian voice, try any English voice
-        if (!voice) {
-          voice = voices.find((v) => v.lang.startsWith("en"));
-        }
-
-        // If found a voice, use it
-        if (voice) {
-          utterance.voice = voice;
-        }
-
-        // Adjust voice based on selected personality
-        switch (state.selectedVoice) {
-          case "sonny":
-            utterance.pitch = 0.9;
-            utterance.rate = 0.9;
-            break;
-          case "bright":
-            utterance.pitch = 1.1;
-            utterance.rate = 1.1;
-            break;
-          case "lucky":
-            utterance.pitch = 1.2;
-            utterance.rate = 1.0;
-            break;
-          default:
-            utterance.pitch = 1.0;
-            utterance.rate = 1.0;
-        }
-
-        window.speechSynthesis.speak(utterance);
-      } else {
-        // For browsers that don't support speech synthesis
-        console.log("Speech synthesis not supported in this browser");
-        console.log("AI would say:", text);
+      // For debugging
+      if (process.env.NODE_ENV === "development") {
+        console.log(
+          `Speaking with voice: ${utterance.voice?.name || "default"}, rate: ${
+            utterance.rate
+          }, pitch: ${utterance.pitch}`
+        );
       }
-    } catch (error) {
-      console.error("Error in text-to-speech:", error);
+
+      // Create a promise that resolves when speech ends
+      return new Promise((resolve) => {
+        utterance.onend = resolve;
+        // Speak the text
+        speechSynthesis.speak(utterance);
+      });
+    },
+    [speechSynthesis, voices]
+  );
+
+  const startListening = useCallback(
+    (errorCallback) => {
+      if (recognition) {
+        // Reset transcript
+        setTranscript("");
+
+        // Add error handling with callback
+        recognition.onerror = (event) => {
+          console.error("Recognition error:", event.error);
+
+          // For no-speech errors, notify via callback but keep listening
+          if (event.error === "no-speech") {
+            console.log("No speech detected");
+            if (errorCallback) {
+              errorCallback("no-speech");
+            }
+            // Don't set isListening to false
+          } else {
+            setIsListening(false);
+          }
+        };
+
+        // Start recognition
+        recognition.start();
+        setIsListening(true);
+        return true;
+      }
+      return false;
+    },
+    [recognition]
+  );
+
+  const stopListening = useCallback(() => {
+    if (recognition && isListening) {
+      recognition.stop();
+      setIsListening(false);
+      return true;
     }
-  };
+    return false;
+  }, [recognition, isListening]);
 
   return {
+    speak,
+    voices,
+    isReady: speechSynthesis !== null && voices.length > 0,
     startListening,
     stopListening,
-    speak,
+    isListening,
+    transcript,
   };
 };

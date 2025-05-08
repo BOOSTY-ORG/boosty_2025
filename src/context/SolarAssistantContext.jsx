@@ -2,9 +2,9 @@ import React, { createContext, useContext, useReducer, useEffect } from "react";
 
 // Initial state for the Solar Assistant application
 const initialState = {
-  view: "landing",
-  language: "english",
-  selectedVoice: "bright",
+  view: localStorage.getItem("solarAssistantView") || "landing",
+  language: localStorage.getItem("solarAssistantLanguage") || "english",
+  selectedVoice: localStorage.getItem("solarAssistantVoice") || "bright",
   isListening: false,
   transcript: "",
   orderDetails: {
@@ -16,70 +16,19 @@ const initialState = {
       state: "Lagos",
       zipCode: "111222",
     },
-    totalBeforeTax: 3000000,
-    tax: 3000,
-    orderTotal: 3003000,
+    totalBeforeTax: 0, // Will be updated from API recommendation
+    tax: 0, // Will be calculated based on recommendation
+    orderTotal: 0, // Will be updated from API recommendation
     paymentMethod: null,
-    invoiceNumber: "BOOST3344A-11",
-    orderNumber: "1133",
-    dateCreated: "Jan 11, 2025",
-    datePaid: "Jan 11, 2025",
+    invoiceNumber: "", // Will be generated when order is placed
+    orderNumber: "", // Will be generated when order is placed
+    dateCreated: "", // Will be set when order is created
+    datePaid: "", // Will be set when payment is made
   },
-  selectedSystem: null,
-  systemOptions: [
-    {
-      id: 1,
-      solarPanels: { watts: 460, quantity: 8 },
-      inverter: { kva: 6, quantity: 1 },
-      batteries: { kwh: 15, quantity: 4 },
-      price: 2220000,
-      installation: true,
-    },
-    {
-      id: 2,
-      solarPanels: { watts: 460, quantity: 10 },
-      inverter: { kva: 7.5, quantity: 1 },
-      batteries: { kwh: 15, quantity: 6 },
-      price: 3000000,
-      installation: true,
-    },
-    {
-      id: 3,
-      solarPanels: { watts: 460, quantity: 12 },
-      inverter: { kva: 8, quantity: 1 },
-      batteries: { kwh: 15, quantity: 7 },
-      price: 3330000,
-      installation: true,
-    },
-  ],
-  products: [
-    {
-      id: 1,
-      name: "Hitachi 7.5 KVA Inverter",
-      type: "inverter",
-      warranty: 3,
-      quantity: 1,
-      imageUrl: "/inverter.png",
-    },
-    {
-      id: 2,
-      name: "Hitachi 15 KWH Lithium Ion Batteries",
-      type: "battery",
-      warranty: 3,
-      quantity: 6,
-      imageUrl: "/battery.png",
-    },
-    {
-      id: 3,
-      name: "Hitachi 460 W Solar Panels",
-      type: "panel",
-      warranty: 3,
-      quantity: 10,
-      imageUrl: "/panel.png",
-    },
-  ],
+  selectedSystem: null, // Will store the API response recommendation
   appliances: [],
-  recognitionSupported: false, // Whether speech recognition is supported
+  recognitionSupported: false,
+  lastComponent: localStorage.getItem("lastComponent") || "landing", // For persistence
 };
 
 // Action types
@@ -96,16 +45,20 @@ const ActionTypes = {
   REMOVE_APPLIANCE: "REMOVE_APPLIANCE",
   UPDATE_PRODUCT_QUANTITY: "UPDATE_PRODUCT_QUANTITY",
   SET_RECOGNITION_SUPPORTED: "SET_RECOGNITION_SUPPORTED",
+  SET_LAST_COMPONENT: "SET_LAST_COMPONENT",
 };
 
 // Reducer function to handle state updates
 const solarAssistantReducer = (state, action) => {
   switch (action.type) {
     case ActionTypes.SET_VIEW:
+      localStorage.setItem("solarAssistantView", action.payload);
       return { ...state, view: action.payload };
     case ActionTypes.SET_LANGUAGE:
+      localStorage.setItem("solarAssistantLanguage", action.payload);
       return { ...state, language: action.payload };
     case ActionTypes.SET_VOICE:
+      localStorage.setItem("solarAssistantVoice", action.payload);
       return { ...state, selectedVoice: action.payload };
     case ActionTypes.SET_LISTENING:
       return { ...state, isListening: action.payload };
@@ -123,6 +76,8 @@ const solarAssistantReducer = (state, action) => {
         ...state,
         appliances: [...state.appliances, action.payload],
       };
+    case ActionTypes.SET_APPLIANCES:
+      return { ...state, appliances: action.payload };
     case ActionTypes.UPDATE_APPLIANCE:
       return {
         ...state,
@@ -150,6 +105,10 @@ const solarAssistantReducer = (state, action) => {
       };
     case ActionTypes.SET_RECOGNITION_SUPPORTED:
       return { ...state, recognitionSupported: action.payload };
+    case ActionTypes.SET_LAST_COMPONENT:
+      localStorage.setItem("lastComponent", action.payload);
+      return { ...state, lastComponent: action.payload };
+
     default:
       return state;
   }
@@ -209,6 +168,11 @@ export const SolarAssistantProvider = ({ children }) => {
         type: ActionTypes.UPDATE_PRODUCT_QUANTITY,
         payload: { id, quantity },
       }),
+    setLastComponent: (component) => {
+      dispatch({ type: ActionTypes.SET_LAST_COMPONENT, payload: component });
+    },
+    setAppliances: (appliances) =>
+      dispatch({ type: ActionTypes.SET_APPLIANCES, payload: appliances }),
   };
 
   // Translations based on the selected language

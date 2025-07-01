@@ -1,0 +1,41 @@
+import React from "react";
+
+const ThreeSteps = () => {
+  return (
+    <section className="bg-boostyFooterBG min-h-[495px] rounded-r-xl text-white py-[96px] pr-[102px] pl-[230px] flex items-center justify-between">
+      <div>
+        <h3 className="text-3xl capitalize leading-10 font-bold">
+          Get Solar in 3 Easy Steps
+        </h3>
+        <div>
+          <button className="capitalize font-bold leading-6 bg-boostyLightGray text-boostyBlack px-6 py-3 min-w-[237px] min-h-[44px] rounded-full mt-6">
+            Start your journey now
+          </button>
+        </div>
+      </div>
+
+      <div className="border border-[#769090] rounded-md p-[47px] space-y-[32px]">
+        <div className="flex items-center gap-4">
+          <img src="/star_1.svg" alt="Step 1" />
+          <p className="font-semibold leading-6 w-[80%]">
+            Talk to the assistant about your energy needs.
+          </p>
+        </div>
+        <div className="flex items-center gap-4">
+          <img src="/start_2.svg" alt="Step 1" />
+          <p className="font-semibold leading-6 w-[80%]">
+            Get a custom solar setup with payment options.
+          </p>
+        </div>
+        <div className="flex items-center gap-4">
+          <img src="/star_3.svg" alt="Step 1" />
+          <p className="font-semibold leading-6 w-[75%]">
+            We handle the installation from start to finish. <i>No stress</i>.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export default ThreeSteps;

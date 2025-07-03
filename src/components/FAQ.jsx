@@ -15,7 +15,7 @@ const FAQItem = ({ question, answer, isOpen, onToggle }) => {
   return (
     <div className="border-b border-gray-200 last:border-b-0">
       <button
-        className="w-full px-10 py-6 text-left flex justify-between items-center hover:bg-gray-50 transition-colors duration-200 focus:outline-none focus:bg-gray-50"
+        className="w-full px-4 sm:px-6 lg:px-10 py-4 sm:py-5 lg:py-6 text-left flex justify-between items-center hover:bg-gray-50 transition-colors duration-200 focus:outline-none focus:bg-gray-50"
         onClick={onToggle}
         aria-expanded={isOpen}
       >
@@ -37,8 +37,11 @@ const FAQItem = ({ question, answer, isOpen, onToggle }) => {
         className="overflow-hidden transition-all duration-300 ease-in-out"
         style={{ height: `${height}px` }}
       >
-        <div ref={contentRef} className="px-10 pb-4 pt-1 w-[880px] bg-gray-50">
-          <div className="text-boostyBlack text-sm md:text-base font-bold leading-relaxed w-[60%]">
+        <div
+          ref={contentRef}
+          className="px-4 sm:px-6 lg:px-10 pb-4 pt-1 w-full max-w-[880px] bg-gray-50"
+        >
+          <div className="text-boostyBlack text-sm md:text-base font-bold leading-relaxed w-full sm:w-[80%] lg:w-[60%]">
             {answer}
           </div>
         </div>
@@ -84,9 +87,11 @@ const FAQ = ({
   return (
     <div className={`rounded-lg ${className}`}>
       <div className={` ${titleClassName}`}>
-        <h2 className="text-[30px] font-bold text-boostyBlack">{title}</h2>
+        <h2 className="text-2xl sm:text-2xl lg:text-[30px] font-bold text-boostyBlack">
+          {title}
+        </h2>
       </div>
-      <div className={`min-w-[880px] ${containerClassName}`}>
+      <div className={`w-full max-w-[880px] mx-auto ${containerClassName}`}>
         <div className="divide-y divide-boostyBlack">
           {faqs.map((faq, index) => (
             <FAQItem

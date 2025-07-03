@@ -5,6 +5,7 @@ import Footer from "./components/Footer";
 import ClerkAuthProvider from "./providers/ClerkAuthProvider";
 import { Provider } from "react-redux";
 import { store } from "./store";
+import Partnerpage from "./pages/Partnerpage";
 
 const App = () => {
   return (
@@ -15,6 +16,7 @@ const App = () => {
             <Navbar />
             <Routes>
               <Route path="/" element={<Homepage />} />
+              <Route path="/become-a-partner" element={<Partnerpage />} />
             </Routes>
             <Footer />
           </Router>

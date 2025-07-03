@@ -1,13 +1,34 @@
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import AuthButtons from "./AuthButtons";
 
 const Navbar = () => {
+  const [scrollY, setScrollY] = useState(0);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  // Memoize the scroll handler to prevent recreation on every render
+  const handleScroll = useCallback(() => {
+    const currentScrollY = window.scrollY;
+    setScrollY(currentScrollY);
+    setIsScrolled(currentScrollY > 10); // Add border after 10px scroll
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [handleScroll]);
+
   return (
-    <nav className="min-h-[65px] flex items-center justify-between px-[128px] py-4">
+    <nav
+      className={`fixed top-0 left-0 right-0 z-40 min-h-[65px] flex items-center justify-between px-7 sm:px-14 lg:px-32 py-4 bg-white transition-all duration-300 ${
+        isScrolled ? "border-b border-gray-200 shadow-md" : ""
+      }`}
+    >
+      {/* Logo - Always visible */}
       <img src="/boosty_logo.svg" alt="Boosty's Company Logo" />
 
-      <div className="space-x-[24px]">
+      {/* Navigation Links - Hidden on mobile, visible on large screens */}
+      <div className="hidden lg:flex space-x-[24px]">
         <Link to="/" className="hover:text-gray-600 transition-colors">
           Home
         </Link>
@@ -25,9 +46,10 @@ const Navbar = () => {
         </Link>
       </div>
 
-      <AuthButtons />
+      {/* Auth Buttons - Always visible */}
+      <AuthButtons scrollY={scrollY} />
     </nav>
   );
 };
 
-export default Navbar;
+export default React.memo(Navbar);

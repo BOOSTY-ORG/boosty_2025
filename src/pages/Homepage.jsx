@@ -35,10 +35,10 @@ const Homepage = () => {
     <section className="">
       <HomeHero />
       <SolarMade />
-      <div className="pr-[128px]">
+      <div className="pr-0 lg:pr-[128px]">
         <ThreeSteps />
       </div>
-      <div className="py-[120px] px-[230px] flex items-center justify-start w-full">
+      <div className="py-20 md:py-24 lg:py-[120px] px-8 md:px-[108px] lg:px-[230px] flex items-center justify-start w-full">
         <FAQ
           title="Frequently Asked Questions"
           titleClassName="font-bold mb-[18px] text-boostyBlack"
@@ -47,7 +47,7 @@ const Homepage = () => {
           containerClassName="border border-boostyBlack"
         />
       </div>
-      <div className="pl-[128px] mb-[120px]">
+      <div className="pl-0 lg:pl-[128px] mb-20 lg:mb-[120px]">
         <CTA />
       </div>
     </section>

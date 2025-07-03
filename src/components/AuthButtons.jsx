@@ -1,11 +1,7 @@
 import React from "react";
-import {
-  SignInButton,
-  SignUpButton,
-  UserButton,
-  useUser,
-} from "@clerk/clerk-react";
+import { SignInButton, SignUpButton, useUser } from "@clerk/clerk-react";
 import { useSelector } from "react-redux";
+import CustomUserMenu from "./CustomUserMenu";
 
 const AuthButtons = () => {
   const { isSignedIn } = useUser();
@@ -20,20 +16,7 @@ const AuthButtons = () => {
   }
 
   if (isSignedIn) {
-    return (
-      <div className="flex items-center space-x-4">
-        <UserButton
-          appearance={{
-            elements: {
-              avatarBox: "w-9 h-9",
-              userButtonPopoverCard: "shadow-lg",
-              userButtonPopoverActionButton: "hover:bg-gray-100",
-            },
-          }}
-          afterSignOutUrl="/"
-        />
-      </div>
-    );
+    return <CustomUserMenu />;
   }
 
   return (

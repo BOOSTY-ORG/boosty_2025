@@ -5,8 +5,8 @@ import { getCurrentYear } from "../utils/getCurrentYear";
 
 const Footer = () => {
   return (
-    <footer className="min-h-max bg-boostyFooterBG text-boostyFooterTxt px-[80px] py-[48px]">
-      <section className="grid grid-cols-4 gap-[80px] border-b-[0.5px] border-[#B78A16] pb-12">
+    <footer className="min-h-max bg-boostyFooterBG text-boostyFooterTxt px-8 lg:px-[80px] py-[48px]">
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-16 lg:gap-[80px] border-b-[0.5px] border-[#B78A16] pb-12">
         <div>
           <h3 className="text-xl font-bold leading-6">
             Subscribe to Newsletter

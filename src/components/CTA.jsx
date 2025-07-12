@@ -1,6 +1,10 @@
 import React from "react";
+import AIAssistantCard from "./AiAssitant";
 
 const CTA = () => {
+  const showConsole = () => {
+    console.log("CTA AI Assitant Clicked");
+  };
   return (
     <section className="min-h-[392px] bg-boostyCTABG rounded-l-lg py-16 md:py-24 lg:py-[96px] pl-6 md:pl-[108px] lg:pl-[100px] pr-6 md:pr-[108px] lg:pr-[270px] shadow-sm grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-0 items-center justify-center">
       <div>
@@ -8,7 +12,7 @@ const CTA = () => {
           Have more questions? The assistant can help you in seconds.
         </h2>
       </div>
-      <div className="min-w-screen lg:min-w-[460px] bg-white px-6 lg:px-[40px] py-[48px] rounded-2xl shadow-lg ">
+      {/* <div className="min-w-screen lg:min-w-[460px] bg-white px-6 lg:px-[40px] py-[48px] rounded-2xl shadow-lg ">
         <div className="flex items-center justify-center gap-1 lg:gap-6">
           <img
             src="/boosty_eye.gif"
@@ -23,7 +27,13 @@ const CTA = () => {
             </span>
           </div>
         </div>
-      </div>
+      </div> */}
+      <AIAssistantCard
+        buttonText="Tap here to start talking"
+        onStartTalking={() => {
+          showConsole();
+        }}
+      />
     </section>
   );
 };

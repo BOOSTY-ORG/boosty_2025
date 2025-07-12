@@ -1,9 +1,15 @@
 import React from "react";
 import { PiInstagramLogo, PiLinkedinLogo } from "react-icons/pi";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { getCurrentYear } from "../utils/getCurrentYear";
 
 const Footer = () => {
+  const location = useLocation();
+
+  // Helper function to determine if a link is active
+  const isActiveLink = (path) => {
+    return location.pathname === path;
+  };
   return (
     <footer className="min-h-max bg-boostyFooterBG text-boostyFooterTxt px-8 lg:px-[80px] py-[48px]">
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-16 lg:gap-[80px] border-b-[0.5px] border-[#B78A16] pb-12">
@@ -62,14 +68,22 @@ const Footer = () => {
               FAQs
             </Link>
             <Link
-              className="hover:underline underline-offset-4 duration-300 transition-all ease-linear"
-              to="/"
+              className={`hover:underline underline-offset-4 duration-300 transition-all ease-linear ${
+                isActiveLink("/terms-&-condition")
+                  ? "underline underline-offset-4"
+                  : ""
+              }`}
+              to="/terms-&-condition"
             >
               Terms & conditions
             </Link>
             <Link
-              className="hover:underline underline-offset-4 duration-300 transition-all ease-linear"
-              to="/"
+              className={`hover:underline underline-offset-4 duration-300 transition-all ease-linear ${
+                isActiveLink("/privacy-policy")
+                  ? "underline underline-offset-4"
+                  : ""
+              }`}
+              to="/privacy-policy"
             >
               Privacy Policy
             </Link>

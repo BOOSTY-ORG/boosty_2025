@@ -1,6 +1,9 @@
-import React from "react";
+import AIAssistantCard from "./AiAssitant";
 
 const HomeHero = () => {
+  const showConsole = () => {
+    console.log("Hero AI Assitant Clicked");
+  };
   return (
     <section className="bg-boostyYellow min-h-max sm:min-h-[428px] px-5 md:px-[108px] lg:px-[229px] flex flex-col lg:flex-row items-center justify-between gap-8 sm:gap-[82px] mt-[65px] py-12 md:py-20 lg:py-0">
       <div>
@@ -15,7 +18,7 @@ const HomeHero = () => {
         </p>
       </div>
 
-      <div className="min-w-[95vw] md:min-w-[70vw] lg:min-w-[460px] bg-white px-2 lg:px-[40px] py-[48px] rounded-2xl shadow-lg">
+      {/* <div className="min-w-[95vw] md:min-w-[70vw] lg:min-w-[460px] bg-white px-2 lg:px-[40px] py-[48px] rounded-2xl shadow-lg">
         <div className="flex items-center justify-center gap-1 sm:gap-6">
           <img
             src="/boosty_eye.gif"
@@ -30,7 +33,13 @@ const HomeHero = () => {
             </span>
           </div>
         </div>
-      </div>
+      </div> */}
+      <AIAssistantCard
+        buttonText="Tap here to start talking"
+        onStartTalking={() => {
+          showConsole();
+        }}
+      />
     </section>
   );
 };

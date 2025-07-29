@@ -29,7 +29,7 @@ const CTA = () => {
         </div>
       </div> */}
       <AIAssistantCard
-        buttonText="Tap here to start talking"
+        buttonText="Tap here to fill in your appliances"
         onStartTalking={() => {
           showConsole();
         }}

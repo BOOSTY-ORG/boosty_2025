@@ -6,12 +6,12 @@ export const syncUserWithBackend = createAsyncThunk(
   async (userData, { rejectWithValue }) => {
     try {
       const response = await fetch(
-        "http://boosty-backend.vercel.app/api/auth/clerk-sync",
+        "https://boosty-2025-backend.vercel.app/api/auth/clerk-sync",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${userData.clerkToken}`,
+            "x-clerk-auth-token": userData.clerkToken,
           },
           body: JSON.stringify({
             email: userData.email,

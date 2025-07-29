@@ -4,6 +4,7 @@ import {
   Route,
   useLocation,
 } from "react-router-dom";
+import { ClerkProvider } from "@clerk/clerk-react";
 import Homepage from "./pages/Homepage";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
@@ -14,46 +15,68 @@ import Partnerpage from "./pages/Partnerpage";
 import Investor from "./pages/Investor";
 import TermsAndConditionsPage from "./pages/TermsAndConditionsPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
-import { scrollToTopOnPageLoad } from "./utils/scrollToTop";
+import VoiceAssistant from "./pages/VoiceAssistant";
 import { useEffect } from "react";
+import { VoiceSettingsProvider } from "./context/VoiceSettingsContext";
+import VoiceSettings from "./pages/VoiceSettings";
+import { RecommendationProvider } from "./context/RecommendationContext";
+import RecommendationResults from "./pages/RecommendationResults";
 
-const App = () => {
+// Component that handles routing logic - INSIDE Router context
+const AppContent = () => {
+  const { pathname } = useLocation();
+
   function ScrollToTop() {
-    const { pathname } = useLocation();
-
     useEffect(() => {
-      // Smooth scroll for better UX
       window.scrollTo({
         top: 0,
         left: 0,
         behavior: "smooth",
       });
-    }, [pathname]); // Triggers every time route changes
+    }, [pathname]);
 
     return null;
   }
+
+  return (
+    <>
+      {pathname !== "/voice-assistant" &&
+        pathname !== "/voice-settings" &&
+        pathname !== "/recommendation-results" && <Navbar />}
+      <ScrollToTop />
+      <Routes>
+        <Route path="/" element={<Homepage />} />
+        <Route path="/become-a-partner" element={<Partnerpage />} />
+        <Route path="/want-to-fund-solar-projects" element={<Investor />} />
+        <Route path="/terms-&-condition" element={<TermsAndConditionsPage />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+        <Route path="/voice-assistant" element={<VoiceAssistant />} />
+        <Route path="/voice-settings" element={<VoiceSettings />} />
+        <Route
+          path="/recommendation-results"
+          element={<RecommendationResults />}
+        />
+      </Routes>
+      {pathname !== "/voice-assistant" &&
+        pathname !== "/voice-settings" &&
+        pathname !== "/recommendation-results" && <Footer />}
+    </>
+  );
+};
+
+// Main App component - provides Router context
+const App = () => {
   return (
     <div className="overflow-x-hidden font-openSans">
       <Provider store={store}>
         <ClerkAuthProvider>
-          <Router>
-            <Navbar />
-            <ScrollToTop />
-            <Routes>
-              <Route path="/" element={<Homepage />} />
-              <Route path="/become-a-partner" element={<Partnerpage />} />
-              <Route
-                path="/want-to-fund-solar-projects"
-                element={<Investor />}
-              />
-              <Route
-                path="/terms-&-condition"
-                element={<TermsAndConditionsPage />}
-              />
-              <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-            </Routes>
-            <Footer />
-          </Router>
+          <VoiceSettingsProvider>
+            <RecommendationProvider>
+              <Router>
+                <AppContent />
+              </Router>
+            </RecommendationProvider>
+          </VoiceSettingsProvider>
         </ClerkAuthProvider>
       </Provider>
     </div>

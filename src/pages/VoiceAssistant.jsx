@@ -1,26 +1,24 @@
 import React, { useState, useEffect, useRef } from "react";
-
+import { useNavigate } from "react-router-dom";
+import { X, Mic, MicOff } from "lucide-react";
+import { useUser } from "@clerk/clerk-react";
+import { useVoiceSettings } from "../context/VoiceSettingsContext";
 import {
   useRecommendationSubmit,
   useRecommendation,
 } from "../context/RecommendationContext";
-import VoiceCircle from "../components/VoiceCircle";
-import VoiceControls from "../components/VoiceControls";
-import ApplianceForm from "../components/ApplianceForm";
-import LoadingOverlay from "../components/LoadingOverlay";
-import SettingsButton from "../components/SettingsButton";
-import { useNavigate } from "react-router-dom";
 
 const VoiceAssistant = () => {
-  // Mock settings and user for demo
-  const settings = {
-    language: "English",
-    voiceEnabled: true,
-    voiceType: "standard",
-    gender: "female",
-  };
-
-  const user = { firstName: "User" };
+  const navigate = useNavigate();
+  const { user } = useUser();
+  const {
+    settings,
+    getVoiceConfig,
+    getBestVoice,
+    getPersonalizedGreeting,
+    getExplanationText,
+    getFieldGuidance,
+  } = useVoiceSettings();
 
   // Recommendation hooks
   const {
@@ -30,8 +28,6 @@ const VoiceAssistant = () => {
   } = useRecommendationSubmit();
   const { recommendationResult, resetRecommendation, hasRecommendation } =
     useRecommendation();
-
-  const navigate = useNavigate();
 
   // AI States
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -64,40 +60,57 @@ const VoiceAssistant = () => {
   const timeoutRef = useRef(null);
   const currentAudioRef = useRef(null);
 
-  // Initialize speech synthesis
+  // Initialize speech synthesis (RESTORED from original)
   useEffect(() => {
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      synthRef.current = window.speechSynthesis;
+    synthRef.current = window.speechSynthesis;
 
-      const checkVoices = () => {
-        const voices = synthRef.current.getVoices();
-        if (voices.length > 0) {
-          setSpeechReady(true);
-        }
-      };
-
-      checkVoices();
-      synthRef.current.onvoiceschanged = checkVoices;
+    if (!synthRef.current) {
+      console.error("Speech synthesis not supported in this browser");
+      return;
     }
+
+    const checkVoices = () => {
+      const voices = synthRef.current.getVoices();
+      console.log("Available voices:", voices.length);
+      if (voices.length > 0) {
+        setSpeechReady(true);
+        console.log("Speech synthesis ready");
+      }
+    };
+
+    checkVoices();
+    synthRef.current.onvoiceschanged = checkVoices;
 
     const readyTimer = setTimeout(() => {
       setPageReady(true);
+      console.log("Page ready for interaction");
     }, 2000);
 
     return () => {
       if (synthRef.current) {
         synthRef.current.cancel();
       }
+
       if (currentAudioRef.current) {
         currentAudioRef.current.pause();
         currentAudioRef.current = null;
       }
+
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
+
       if (formCompleteTimer) {
         clearTimeout(formCompleteTimer);
       }
+
+      const audioElements = document.querySelectorAll("audio");
+      audioElements.forEach((audio) => {
+        audio.pause();
+        audio.src = "";
+      });
+
+      console.log("🧹 Voice assistant cleanup completed");
       clearTimeout(readyTimer);
     };
   }, []);
@@ -114,67 +127,202 @@ const VoiceAssistant = () => {
     }
   }, [error]);
 
-  // Mock speech functions for demo
+  // RESTORED: Real speech functions from original
+  const speakTextWithGoogleTTS = async (text) => {
+    try {
+      console.log("🎙️ Trying Google Cloud TTS...");
+
+      const response = await fetch("http://localhost:3001/api/tts/speak", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: text,
+          voiceType: settings.voiceType,
+          gender: settings.gender,
+          language: settings.language,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Google TTS error: ${response.status}`);
+      }
+
+      console.log("✅ Google TTS API successful!");
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+
+      return new Promise((resolve, reject) => {
+        const audio = new Audio(audioUrl);
+        audio.volume = volume;
+
+        currentAudioRef.current = audio;
+
+        audio.onplay = () => {
+          console.log("🎵 Google TTS speech started!");
+          setTtsStatus("premium");
+        };
+
+        audio.onended = () => {
+          console.log("✅ Google TTS speech ended");
+          URL.revokeObjectURL(audioUrl);
+          currentAudioRef.current = null;
+          resolve();
+        };
+
+        audio.onerror = (error) => {
+          console.error("❌ Audio playback error:", error);
+          URL.revokeObjectURL(audioUrl);
+          currentAudioRef.current = null;
+          reject(error);
+        };
+
+        audio.onpause = () => {
+          console.log("⏸️ Google TTS speech cancelled");
+          URL.revokeObjectURL(audioUrl);
+          currentAudioRef.current = null;
+          resolve();
+        };
+
+        audio.play().catch(reject);
+      });
+    } catch (error) {
+      console.log("❌ Google TTS failed:", error.message);
+      throw error;
+    }
+  };
+
+  const speakTextWithWebSpeech = async (text) => {
+    console.log("🔊 Using Web Speech API (free fallback)");
+
+    if (!synthRef.current) {
+      throw new Error("Web Speech API not available");
+    }
+
+    return new Promise((resolve) => {
+      const naturalText = text
+        .replace(/\./g, "... ")
+        .replace(/,/g, ", ")
+        .replace(/!/g, "! ")
+        .replace(/\?/g, "? ");
+
+      const utterance = new SpeechSynthesisUtterance(naturalText);
+      const voiceConfig = getVoiceConfig();
+      const bestVoice = getBestVoice();
+
+      if (bestVoice) {
+        utterance.voice = bestVoice;
+      }
+
+      utterance.rate = voiceConfig.rate;
+      utterance.pitch = voiceConfig.pitch;
+      utterance.volume = volume;
+      utterance.lang = voiceConfig.lang;
+
+      utterance.onstart = () => {
+        console.log("🔊 Web Speech started - free voice active");
+        setTtsStatus("free");
+      };
+
+      utterance.onend = () => {
+        console.log("✅ Web Speech ended");
+        resolve();
+      };
+
+      utterance.onerror = (error) => {
+        console.error("❌ Web Speech error:", error);
+        resolve();
+      };
+
+      synthRef.current.cancel();
+
+      setTimeout(() => {
+        synthRef.current.speak(utterance);
+      }, 100);
+    });
+  };
+
   const speakText = async (text) => {
+    console.log("speakText called with:", text);
+
     if (isMuted || !settings.voiceEnabled || isNavigating) {
+      console.log("🔇 Speech blocked - muted, disabled, or navigating");
       return Promise.resolve();
     }
 
     setIsSpeaking(true);
 
-    // Mock speech delay
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      if (ttsStatus !== "free") {
+        try {
+          await speakTextWithGoogleTTS(text);
+          setIsSpeaking(false);
+          return;
+        } catch (error) {
+          console.log("🔄 Google TTS failed, falling back to Web Speech API");
+          setTtsStatus("free");
+        }
+      }
 
-    setIsSpeaking(false);
+      await speakTextWithWebSpeech(text);
+      setIsSpeaking(false);
+    } catch (error) {
+      console.error("❌ All TTS methods failed:", error);
+      setIsSpeaking(false);
+    }
   };
 
-  const getPersonalizedGreeting = (name) => {
-    return settings.language === "Pidgin"
-      ? `Hello ${
-          name || "friend"
-        }! I be your solar assistant. I go help you find the perfect solar system for your house.`
-      : `Hello ${
-          name || "friend"
-        }! I'm your solar assistant. I'll help you find the perfect solar system for your home.`;
-  };
-
-  const getExplanationText = () => {
-    return settings.language === "Pidgin"
-      ? "Make you fill this form with your appliance details. I need to know the name, how many hours you dey use am for day and night, and the wattage."
-      : "Please fill out this form with your appliance details. I need to know the name, how many hours you use it during day and night, and the wattage.";
-  };
-
-  const getFieldGuidance = (fieldName) => {
-    const guidanceMap = {
-      name:
-        settings.language === "Pidgin"
-          ? "Write the name of your appliance here, like Freezer or TV"
-          : "Enter the name of your appliance here, like Freezer or TV",
-      quantity:
-        settings.language === "Pidgin"
-          ? "How many of this appliance you get?"
-          : "How many of this appliance do you have?",
-      dayHours:
-        settings.language === "Pidgin"
-          ? "How many hours you dey use am for daytime?"
-          : "How many hours do you use it during the day?",
-      nightHours:
-        settings.language === "Pidgin"
-          ? "How many hours you dey use am for nighttime?"
-          : "How many hours do you use it at night?",
-      wattage:
-        settings.language === "Pidgin"
-          ? "What be the power consumption in watts?"
-          : "What is the power consumption in watts?",
-    };
-    return guidanceMap[fieldName] || "Please fill in this field";
-  };
-
-  // Form completion helper functions
+  // RESTORED: All the original helper functions
   const isFormComplete = () => {
     return (
       applianceData.name.trim() !== "" && applianceData.wattage.trim() !== ""
     );
+  };
+
+  const navigateToVoiceSettings = async () => {
+    console.log("🔧 Starting navigation to voice-settings with cleanup");
+
+    setIsNavigatingToSettings(true);
+    setIsNavigating(true);
+    setIsSpeaking(false);
+
+    if (synthRef.current) {
+      synthRef.current.cancel();
+    }
+
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current.currentTime = 0;
+      currentAudioRef.current.src = "";
+      currentAudioRef.current = null;
+    }
+
+    document.querySelectorAll("audio").forEach((audio) => {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.src = "";
+      audio.load();
+    });
+
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+
+    if (formCompleteTimer) {
+      clearTimeout(formCompleteTimer);
+      setFormCompleteTimer(null);
+    }
+
+    console.log("🔇 All audio stopped, waiting for cleanup to complete...");
+
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    console.log("✅ Cleanup complete, navigating...");
+
+    navigate("/voice-settings");
   };
 
   const promptFormSubmission = async () => {
@@ -204,23 +352,54 @@ const VoiceAssistant = () => {
     }
   };
 
-  // Start AI Introduction
+  // RESTORED: Start AI Introduction from original
   const startAIIntroduction = async () => {
     if (hasGreeted) return;
 
     setHasGreeted(true);
 
     try {
+      if (!synthRef.current) {
+        console.log("Speech synthesis not available");
+        setCurrentPhase("interactive");
+        setShowForm(true);
+        return;
+      }
+
+      const voices = synthRef.current.getVoices();
+      console.log("Available voices when starting:", voices.length);
+      if (voices.length === 0) {
+        console.log("Waiting for voices to load...");
+        await new Promise((resolve) => {
+          const checkVoices = () => {
+            if (synthRef.current.getVoices().length > 0) {
+              resolve();
+            }
+          };
+          synthRef.current.onvoiceschanged = checkVoices;
+          setTimeout(resolve, 3000);
+        });
+      }
+
+      console.log("🎯 STARTING GREETING PHASE");
       setCurrentPhase("greeting");
+
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       const greeting = getPersonalizedGreeting(user?.firstName);
+      console.log("About to speak greeting:", greeting);
+
       await speakText(greeting);
 
+      console.log("Greeting completed - waiting for user confirmation");
+
+      console.log("Pausing for 2 seconds after greeting...");
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
+      console.log("🎯 STARTING EXPLANATION PHASE");
       setCurrentPhase("explaining");
       setShowForm(true);
+      console.log("Form shown, waiting before explanation...");
 
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
@@ -237,10 +416,14 @@ const VoiceAssistant = () => {
 
       const fullExplanation =
         explanation + muteInstruction + settingsInstruction;
+
+      console.log("About to speak explanation:", fullExplanation);
       await speakText(fullExplanation);
+      console.log("Explanation completed");
 
       await new Promise((resolve) => setTimeout(resolve, 500));
       setCurrentPhase("interactive");
+      console.log("Now in interactive phase");
     } catch (error) {
       console.error("Error in AI introduction:", error);
       setCurrentPhase("interactive");
@@ -248,7 +431,81 @@ const VoiceAssistant = () => {
     }
   };
 
-  // Event Handlers
+  // RESTORED: All original field guidance functions
+  const getFieldReadback = (fieldName, value) => {
+    const { language } = settings;
+
+    if (language === "Pidgin") {
+      switch (fieldName) {
+        case "name":
+          return `You don write ${value} as your appliance name.`;
+        case "quantity":
+          return `You set the quantity to ${value} ${
+            value === "1" ? "piece" : "pieces"
+          }.`;
+        case "dayHours":
+          return `You don enter ${value} hours for day time usage.`;
+        case "nightHours":
+          return `You don enter ${value} hours for night time usage.`;
+        case "wattage":
+          return `You set the power consumption to ${value} watts.`;
+        default:
+          return `You don enter ${value} for this field.`;
+      }
+    } else {
+      switch (fieldName) {
+        case "name":
+          return `You have entered ${value} as your appliance name.`;
+        case "quantity":
+          return `You have set the quantity to ${value} ${
+            value === "1" ? "unit" : "units"
+          }.`;
+        case "dayHours":
+          return `You've entered ${value} hours for daytime usage.`;
+        case "nightHours":
+          return `You've entered ${value} hours for nighttime usage.`;
+        case "wattage":
+          return `You've set the power consumption to ${value} watts.`;
+        default:
+          return `You have entered ${value} for this field.`;
+      }
+    }
+  };
+
+  const handleFieldFocus = async (fieldName) => {
+    if (currentPhase !== "interactive" || isSpeaking) return;
+
+    resetFormTimer();
+
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    const fieldValue = applianceData[fieldName];
+
+    let responseText;
+
+    if (fieldValue && fieldValue.trim() !== "") {
+      responseText = getFieldReadback(fieldName, fieldValue);
+    } else {
+      responseText = getFieldGuidance(fieldName);
+    }
+
+    await speakText(responseText);
+  };
+
+  const handleInputChange = (field, value) => {
+    setApplianceData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+
+    // Reset recommendation state when user starts editing
+    if (hasRecommendation) {
+      resetRecommendation();
+    }
+
+    resetFormTimer();
+  };
+
   const handleMicClick = () => {
     if (currentPhase === "waiting" && pageReady && speechReady) {
       startAIIntroduction();
@@ -268,50 +525,32 @@ const VoiceAssistant = () => {
   };
 
   const handleExitClick = () => {
+    if (synthRef.current) {
+      synthRef.current.cancel();
+    }
+
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+    }
+
+    setIsSpeaking(false);
+    setIsMuted(false);
+
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    if (formCompleteTimer) {
+      clearTimeout(formCompleteTimer);
+    }
+
+    console.log("🛑 All audio stopped - exiting voice assistant");
+
     navigate("/");
   };
 
-  const handleSettingsClick = async () => {
-    setIsNavigatingToSettings(true);
-    // Mock navigation delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    console.log("Navigate to settings");
-    setIsNavigatingToSettings(false);
-  };
-
-  const handleInputChange = (field, value) => {
-    setApplianceData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-
-    // Reset recommendation state when user modifies form
-    if (hasRecommendation) {
-      resetRecommendation();
-    }
-
-    resetFormTimer();
-  };
-
-  const handleFieldFocus = async (fieldName) => {
-    if (currentPhase !== "interactive" || isSpeaking) return;
-
-    resetFormTimer();
-    await new Promise((resolve) => setTimeout(resolve, 300));
-
-    const fieldValue = applianceData[fieldName];
-    let responseText;
-
-    if (fieldValue && fieldValue.trim() !== "") {
-      // Mock field readback
-      responseText = `You have entered ${fieldValue} for ${fieldName}`;
-    } else {
-      responseText = getFieldGuidance(fieldName);
-    }
-
-    await speakText(responseText);
-  };
-
+  // UPDATED: handleConfirmDetails with context integration
   const handleConfirmDetails = async () => {
     if (!applianceData.name || !applianceData.wattage) {
       const errorText =
@@ -324,30 +563,13 @@ const VoiceAssistant = () => {
     }
 
     try {
-      // Submit appliance data using context
+      // Submit appliance data using context (AI stays silent during processing)
       const result = await submitAppliance(applianceData);
 
       if (result) {
-        // Success - AI stays silent as per requirements
+        // Success - Navigate to results page (AI stays silent as per requirements)
         console.log("Recommendation received:", result);
-
-        // Navigate to recommendation results page
-        // In real app with react-router, this would be:
-        // navigate('/recommendation-results');
-        // The RecommendationDisplay page would get data from context using:
-        // const { recommendationResult } = useRecommendation();
-        console.log("Would navigate to /recommendation-results");
-        console.log("Recommendation data available in context:", result);
-
-        // For demo, let's show that we got the data
-        const successText =
-          settings.language === "Pidgin"
-            ? `Perfect! I don find your solar system for ₦${result.recommendation.pricing.totalAmount.toLocaleString()}.`
-            : `Perfect! I found your solar system for ₦${result.recommendation.pricing.totalAmount.toLocaleString()}.`;
-
-        // Note: In actual implementation, AI should stay silent here
-        // This is just for demo to show the context is working
-        await speakText(successText);
+        navigate("/recommendation-results");
       }
     } catch (err) {
       console.error("Failed to get recommendations:", err);
@@ -361,66 +583,266 @@ const VoiceAssistant = () => {
     }
   };
 
+  const getFormClassName = () => {
+    return "bg-white rounded-2xl p-6 w-full max-w-lg shadow-lg animate-fade-in";
+  };
+
   return (
-    <div className="fixed inset-0 bg-yellow-400 overflow-hidden">
-      {/* Settings Button */}
-      <SettingsButton
-        onClick={handleSettingsClick}
+    <div className="fixed inset-0 bg-boostyYellow overflow-hidden">
+      {/* Settings Button - DISABLED until interactive phase */}
+      <button
+        onClick={navigateToVoiceSettings}
         disabled={isNavigatingToSettings || currentPhase !== "interactive"}
-        isNavigating={isNavigatingToSettings}
-      />
+        className={`absolute top-6 right-6 w-10 h-10 bg-yellow-600 bg-opacity-20 rounded-full flex items-center justify-center hover:bg-opacity-30 transition-all ${
+          isNavigatingToSettings || currentPhase !== "interactive"
+            ? "opacity-50 cursor-not-allowed"
+            : ""
+        }`}
+      >
+        <img src="/settings.svg" alt="" className="w-7 h-7" />
+      </button>
 
       {/* Main Content */}
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        {/* Voice Circle */}
-        <VoiceCircle
-          isSpeaking={isSpeaking}
-          currentPhase={currentPhase}
-          pageReady={pageReady}
-          speechReady={speechReady}
-        />
+        {/* Voice Circle with Animation */}
+        <div className="flex flex-col items-center mb-8">
+          <div
+            className={`relative bg-white rounded-full flex items-center justify-center shadow-lg transition-all duration-500 ${
+              isSpeaking
+                ? "w-52 h-52 shadow-2xl scale-105"
+                : "w-48 h-48 shadow-lg scale-100"
+            }`}
+          >
+            {/* Soundwave Bars - 5 bars with middle tallest */}
+            <div className="flex items-center space-x-1">
+              {[1, 2, 3, 4, 5].map((bar) => {
+                const baseHeight =
+                  bar === 3 ? 8 : bar === 2 || bar === 4 ? 6 : 4;
+                const animatedHeight = isSpeaking
+                  ? bar === 3
+                    ? 12
+                    : bar === 2 || bar === 4
+                    ? 10
+                    : 6
+                  : baseHeight;
 
-        {/* Voice Controls */}
-        <VoiceControls
-          isMuted={isMuted}
-          onMicClick={handleMicClick}
-          onExitClick={handleExitClick}
-        />
+                return (
+                  <div
+                    key={bar}
+                    className={`w-2 bg-yellow-600 rounded-full transition-all duration-200 ${
+                      isSpeaking ? "soundwave-animate" : ""
+                    }`}
+                    style={{
+                      height: `${animatedHeight * 4}px`,
+                      animationDelay: isSpeaking ? `${bar * 0.1}s` : "0s",
+                    }}
+                  />
+                );
+              })}
+            </div>
+          </div>
 
-        {/* Appliance Form */}
+          {/* Control Buttons */}
+          <div className="flex space-x-6 mt-8">
+            <button
+              onClick={handleExitClick}
+              className="w-14 h-14 bg-yellow-600 bg-opacity-20 rounded-full flex items-center justify-center hover:bg-opacity-30 transition-all"
+            >
+              <X size={20} className="text-boostyBlack" />
+            </button>
+
+            <button
+              onClick={handleMicClick}
+              className="w-14 h-14 bg-yellow-600 bg-opacity-20 rounded-full flex items-center justify-center hover:bg-opacity-30 transition-all"
+            >
+              {isMuted ? (
+                <MicOff size={20} className="text-boostyBlack" />
+              ) : (
+                <Mic size={20} className="text-boostyBlack" />
+              )}
+            </button>
+          </div>
+
+          {/* Instructions - Only when waiting */}
+          {currentPhase === "waiting" && pageReady && speechReady && (
+            <div className="mt-6 text-center">
+              <p className="text-sm text-boostyBlack opacity-75">
+                Click the mic when you're ready to begin
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Appliance Form - Shows during explanation phase */}
         {showForm && (
-          <ApplianceForm
-            applianceData={applianceData}
-            onInputChange={handleInputChange}
-            onFieldFocus={handleFieldFocus}
-            onConfirmDetails={handleConfirmDetails}
-            isLoading={isGettingRecommendations}
-            showPriceGuidance={false}
-            settings={settings}
-          />
+          <div className={getFormClassName()}>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block font-semibold text-[#3D3E3E] mb-2">
+                  Name of Item
+                </label>
+                <input
+                  type="text"
+                  value={applianceData.name}
+                  onChange={(e) => handleInputChange("name", e.target.value)}
+                  onFocus={() => handleFieldFocus("name")}
+                  placeholder="Freezer"
+                  className="w-full px-3 py-2 border border-[#A6A0A3] rounded-lg focus:outline-none focus:ring-2 focus:ring-boostyYellow focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold text-[#3D3E3E] mb-2">
+                  Quantity
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={applianceData.quantity}
+                  onChange={(e) =>
+                    handleInputChange("quantity", e.target.value)
+                  }
+                  onFocus={() => handleFieldFocus("quantity")}
+                  className="w-full px-3 py-2 border border-[#A6A0A3] rounded-lg focus:outline-none focus:ring-2 focus:ring-boostyYellow focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div>
+                <label className="block font-semibold text-[#3D3E3E] mb-2">
+                  Day Hours
+                </label>
+                <input
+                  type="text"
+                  value={applianceData.dayHours}
+                  onChange={(e) =>
+                    handleInputChange("dayHours", e.target.value)
+                  }
+                  onFocus={() => handleFieldFocus("dayHours")}
+                  placeholder="8 hours"
+                  className="w-full px-3 py-2 border border-[#A6A0A3] rounded-lg focus:outline-none focus:ring-2 focus:ring-boostyYellow focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold text-[#3D3E3E] mb-2">
+                  Night Hours
+                </label>
+                <input
+                  type="text"
+                  value={applianceData.nightHours}
+                  onChange={(e) =>
+                    handleInputChange("nightHours", e.target.value)
+                  }
+                  onFocus={() => handleFieldFocus("nightHours")}
+                  placeholder="3 hours"
+                  className="w-full px-3 py-2 border border-[#A6A0A3] rounded-lg focus:outline-none focus:ring-2 focus:ring-boostyYellow focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold text-[#3D3E3E] mb-2">
+                  Wattage
+                </label>
+                <input
+                  type="text"
+                  value={applianceData.wattage}
+                  onChange={(e) => handleInputChange("wattage", e.target.value)}
+                  onFocus={() => handleFieldFocus("wattage")}
+                  placeholder="800 W"
+                  className="w-full px-3 py-2 border border-[#A6A0A3] rounded-lg focus:outline-none focus:ring-2 focus:ring-boostyYellow focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end">
+              <button
+                onClick={handleConfirmDetails}
+                disabled={isGettingRecommendations}
+                className={`min-w-[170px] min-h-[36px] border-[2px] border-[#736C59] bg-[#E8F2F2] text-[#3D3E3E] font-bold py-3 rounded-full transition-all flex items-center justify-center ${
+                  isGettingRecommendations
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:bg-[#d6e8e8]"
+                }`}
+              >
+                {isGettingRecommendations ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-[#3D3E3E] border-t-transparent rounded-full animate-spin mr-2"></div>
+                    {settings.language === "Pidgin"
+                      ? "Processing..."
+                      : "Processing..."}
+                  </>
+                ) : (
+                  "Confirm details"
+                )}
+              </button>
+            </div>
+          </div>
         )}
       </div>
 
       {/* Loading Overlay */}
-      <LoadingOverlay
-        isVisible={isGettingRecommendations}
-        settings={settings}
-      />
+      {isGettingRecommendations && (
+        <div className="absolute inset-0 bg-boostyYellow bg-opacity-95 flex items-center justify-center z-50">
+          <div className="text-center">
+            <div className="w-20 h-20 border-4 border-yellow-600 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+            <p className="text-boostyBlack font-bold text-xl mb-2">
+              {settings.language === "Pidgin"
+                ? "I dey find your perfect solar system..."
+                : "Finding your perfect solar system..."}
+            </p>
+            <p className="text-boostyBlack text-sm opacity-75">
+              {settings.language === "Pidgin"
+                ? "No worry, e no go take time"
+                : "This won't take long"}
+            </p>
+          </div>
+        </div>
+      )}
 
-      {/* Settings Navigation Loading */}
+      {/* SETTINGS NAVIGATION LOADING OVERLAY */}
       {isNavigatingToSettings && (
-        <div className="absolute inset-0 bg-yellow-400 bg-opacity-95 flex items-center justify-center z-50">
+        <div className="absolute inset-0 bg-boostyYellow bg-opacity-95 flex items-center justify-center z-50">
           <div className="text-center">
             <div className="w-16 h-16 border-4 border-yellow-600 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
-            <p className="text-gray-800 font-bold text-lg">
+            <p className="text-boostyBlack font-bold text-lg">
               Opening voice settings...
             </p>
-            <p className="text-gray-800 text-sm opacity-75 mt-2">
+            <p className="text-boostyBlack text-sm opacity-75 mt-2">
               Stopping current audio
             </p>
           </div>
         </div>
       )}
+
+      <style>{`
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .animate-fade-in {
+          animation: fade-in 0.5s ease-out;
+        }
+
+        @keyframes soundwave-bounce {
+          0%,
+          100% {
+            transform: scaleY(1);
+          }
+          50% {
+            transform: scaleY(1.5);
+          }
+        }
+
+        .soundwave-animate {
+          animation: soundwave-bounce 0.8s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 };

@@ -15,19 +15,35 @@ const VoiceSettings = () => {
   const [tempVoiceType, setTempVoiceType] = useState("American");
   const [tempGender, setTempGender] = useState("male");
 
-  // Voice options - matching your context structure
+  // Complete voice options with both genders - matching your context
   const voices = [
     {
+      id: "american-male",
       name: "Sonny",
-      description: "American", // ✅ Changed from "Calm" to "American"
-      type: "American",
+      description: "American Male",
+      type: "American", // matches context
       gender: "male",
     },
     {
+      id: "american-female",
+      name: "Sarah",
+      description: "American Female",
+      type: "American",
+      gender: "female",
+    },
+    {
+      id: "nigerian-male",
       name: "Bright",
-      description: "Nigerian", // ✅ Changed from "Energetic" to "Nigerian"
+      description: "Nigerian Male",
+      type: "Nigeria", // matches context exactly
+      gender: "male",
+    },
+    {
+      id: "nigerian-female",
+      name: "Ada",
+      description: "Nigerian Female",
       type: "Nigeria",
-      gender: "male", // ✅ Changed to male to use "elijah" (actual Nigerian voice)
+      gender: "female",
     },
   ];
 
@@ -37,17 +53,16 @@ const VoiceSettings = () => {
   // Audio reference for voice preview
   const currentAudioRef = useRef(null);
 
+  // Cleanup lingering audio on mount
   useEffect(() => {
     console.log(
-      "🔇 Voice Settings page mounted - stopping any lingering VoiceAssistant audio"
+      "🔇 Voice Settings page mounted - stopping any lingering audio"
     );
 
-    // ONE-TIME cleanup of lingering audio from VoiceAssistant page
     if (window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
 
-    // Stop all existing audio elements (catches lingering Google TTS from VoiceAssistant)
     document.querySelectorAll("audio").forEach((audio) => {
       audio.pause();
       audio.currentTime = 0;
@@ -55,18 +70,13 @@ const VoiceSettings = () => {
       audio.load();
     });
 
-    console.log(
-      "✅ Lingering audio cleanup complete - voice-settings can now use audio normally"
-    );
-
-    // Small delay to ensure cleanup completes, then voice-settings page can use audio
-    setTimeout(() => {
-      console.log("🎙️ Voice-settings page ready for its own audio");
-    }, 100);
+    console.log("✅ Audio cleanup complete");
   }, []);
 
   // Initialize settings when component mounts
   useEffect(() => {
+    console.log("Initializing with settings:", settings);
+
     // Store original settings for cancel functionality
     setOriginalSettings({
       language: settings.language,
@@ -79,12 +89,38 @@ const VoiceSettings = () => {
     setTempVoiceType(settings.voiceType);
     setTempGender(settings.gender);
 
-    // Find current voice index
+    // Find current voice index based on type AND gender
     const currentIndex = voices.findIndex(
       (voice) =>
         voice.type === settings.voiceType && voice.gender === settings.gender
     );
-    setCurrentVoiceIndex(currentIndex >= 0 ? currentIndex : 0);
+
+    console.log("Found voice index:", currentIndex);
+    console.log("Looking for:", {
+      type: settings.voiceType,
+      gender: settings.gender,
+    });
+    console.log("Available voices:", voices);
+
+    // If exact match found, use it; otherwise find best fallback
+    if (currentIndex >= 0) {
+      setCurrentVoiceIndex(currentIndex);
+    } else {
+      // Fallback: try to match just the voice type
+      const typeIndex = voices.findIndex(
+        (voice) => voice.type === settings.voiceType
+      );
+      if (typeIndex >= 0) {
+        setCurrentVoiceIndex(typeIndex);
+        // Update temp gender to match the found voice
+        setTempGender(voices[typeIndex].gender);
+      } else {
+        // Final fallback to first voice
+        setCurrentVoiceIndex(0);
+        setTempVoiceType(voices[0].type);
+        setTempGender(voices[0].gender);
+      }
+    }
   }, [settings]);
 
   // Get current voice
@@ -92,6 +128,8 @@ const VoiceSettings = () => {
 
   // Handle voice switching with arrows
   const handleVoiceChange = (direction) => {
+    if (isPlaying) return; // Don't change while playing
+
     let newIndex;
     if (direction === "next") {
       newIndex = (currentVoiceIndex + 1) % voices.length;
@@ -103,30 +141,51 @@ const VoiceSettings = () => {
     setCurrentVoiceIndex(newIndex);
     const selectedVoice = voices[newIndex];
 
-    // Update temporary settings
+    console.log("Voice changed to:", selectedVoice);
+
+    // Update temporary settings to match selected voice
     setTempVoiceType(selectedVoice.type);
     setTempGender(selectedVoice.gender);
 
-    // ✅ REMOVED: Auto language switching - let user choose language independently
-    // Don't auto-change language when switching voices
-
-    // Play voice preview
+    // Play voice preview with current language
     playVoicePreview(selectedVoice);
   };
 
-  // Play voice preview
+  // Play voice preview with current language
   const playVoicePreview = async (voice) => {
+    return playVoicePreviewWithLanguage(voice, tempLanguage);
+  };
+
+  // Handle language toggle - maintains current voice type and gender
+  const handleLanguageToggle = (language) => {
+    setTempLanguage(language);
+
+    // Play preview with current voice and new language
+    if (currentVoice) {
+      // Use the new language directly rather than waiting for state
+      playVoicePreviewWithLanguage(currentVoice, language);
+    }
+  };
+
+  // Helper function to play preview with specific language
+  const playVoicePreviewWithLanguage = async (voice, language) => {
     if (isPlaying) return;
 
     setIsPlaying(true);
 
     try {
       const sampleText =
-        tempLanguage === "Pidgin"
+        language === "Pidgin"
           ? "Hello, na so I dey sound. I fit help you with your energy needs."
           : "Hello, this is how I sound. I can help you with your energy needs.";
 
-      console.log("🔍 Making TTS request...");
+      console.log(
+        "🔍 Making TTS request for:",
+        voice,
+        "with language:",
+        language
+      );
+
       const response = await fetch("http://localhost:3001/api/tts/speak", {
         method: "POST",
         headers: {
@@ -136,19 +195,18 @@ const VoiceSettings = () => {
           text: sampleText,
           voiceType: voice.type,
           gender: voice.gender,
-          language: tempLanguage,
+          language: language,
         }),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.log("Error response:", errorText);
+        console.log("TTS Error response:", errorText);
         throw new Error(`TTS API error: ${response.status} - ${errorText}`);
       }
 
       const audioBlob = await response.blob();
-      console.log("Audio blob size:", audioBlob.size);
-      console.log("Audio blob type:", audioBlob.type);
+      console.log("Audio blob size:", audioBlob.size, "type:", audioBlob.type);
 
       if (audioBlob.size === 0) {
         throw new Error("Received empty audio blob");
@@ -183,41 +241,41 @@ const VoiceSettings = () => {
       };
 
       audio.onplay = () => {
-        console.log("🎵 Voice preview started playing");
+        console.log("🎵 Voice preview started");
       };
 
-      // Play the audio
       console.log("▶️ Starting voice preview playback...");
       await audio.play();
     } catch (error) {
       console.error("Voice preview failed:", error);
       setIsPlaying(false);
-    }
-  };
 
-  // Handle language toggle
-  const handleLanguageToggle = (language) => {
-    setTempLanguage(language);
-
-    // Just play preview with current voice and new language
-    if (voices[currentVoiceIndex]) {
-      playVoicePreview(voices[currentVoiceIndex]);
+      // Show user-friendly error
+      console.log(`Voice preview failed: ${error.message}`);
     }
   };
 
   // Handle Done - save settings
   const handleDone = () => {
+    console.log("Saving settings:", {
+      tempLanguage,
+      tempVoiceType,
+      tempGender,
+    });
+
     updateSettings({
       language: tempLanguage,
       voiceType: tempVoiceType,
       gender: tempGender,
     });
+
     navigate("/voice-assistant");
   };
 
   // Handle Cancel - revert to original settings
   const handleCancel = () => {
     if (originalSettings) {
+      console.log("Reverting to original settings:", originalSettings);
       updateSettings(originalSettings);
     }
     navigate("/voice-assistant");
@@ -246,7 +304,7 @@ const VoiceSettings = () => {
                 : "text-[#736C59] font-semibold"
             }`}
           >
-            English
+            Pidgin
           </button>
           <button
             onClick={() => handleLanguageToggle("English")}
@@ -256,7 +314,7 @@ const VoiceSettings = () => {
                 : "text-[#736C59] font-semibold"
             }`}
           >
-            Pidgin
+            English
           </button>
         </div>
       </div>
@@ -312,65 +370,51 @@ const VoiceSettings = () => {
           {/* Previous Button */}
           <button
             onClick={() => handleVoiceChange("prev")}
-            className="w-12 h-12 flex items-center justify-center"
+            className="w-12 h-12 flex items-center justify-center hover:bg-black hover:bg-opacity-10 rounded-full transition-colors"
             disabled={isPlaying}
           >
-            <ChevronLeft size={24} className="text-boostyBlack" />
+            <ChevronLeft
+              size={24}
+              className={`text-boostyBlack ${
+                isPlaying ? "opacity-50" : "opacity-100"
+              }`}
+            />
           </button>
 
-          {/* Voice Cards */}
-          <div className="flex space-x-6">
-            {voices.map((voice, index) => {
-              const isActive = index === currentVoiceIndex;
-              const position =
-                index < currentVoiceIndex
-                  ? "left"
-                  : index > currentVoiceIndex
-                  ? "right"
-                  : "center";
-
-              return (
-                <div
-                  key={voice.name}
-                  className={`text-center transition-all duration-300 ${
-                    position === "center"
-                      ? "opacity-100 scale-100"
-                      : position === "left"
-                      ? "opacity-60 scale-90 -translate-x-4"
-                      : "opacity-60 scale-90 translate-x-4"
-                  }`}
-                >
-                  <h3
-                    className={`text-xl font-bold text-boostyBlack ${
-                      isActive ? "text-2xl" : ""
-                    }`}
-                  >
-                    {voice.name}
-                  </h3>
-                  <p className="text-boostyBlack opacity-75 text-sm">
-                    {voice.description}
-                  </p>
-                </div>
-              );
-            })}
+          {/* Current Voice Display */}
+          <div className="text-center min-w-[200px]">
+            <h3 className="text-2xl font-bold text-boostyBlack mb-2">
+              {currentVoice?.name}
+            </h3>
+            <p className="text-boostyBlack opacity-75 text-sm">
+              {currentVoice?.description}
+            </p>
           </div>
 
           {/* Next Button */}
           <button
             onClick={() => handleVoiceChange("next")}
-            className="w-12 h-12 rounded-full flex items-center justify-center"
+            className="w-12 h-12 flex items-center justify-center hover:bg-black hover:bg-opacity-10 rounded-full transition-colors"
             disabled={isPlaying}
           >
-            <ChevronRight size={24} className="text-boostyBlack" />
+            <ChevronRight
+              size={24}
+              className={`text-boostyBlack ${
+                isPlaying ? "opacity-50" : "opacity-100"
+              }`}
+            />
           </button>
         </div>
 
         {/* Current Selection Display */}
         <div className="mb-8 text-center">
           <p className="text-boostyBlack opacity-75">
-            Selected: <span className="font-medium">{currentVoice?.name}</span>{" "}
-            •<span className="font-medium"> {tempLanguage}</span> •
-            <span className="font-medium"> {currentVoice?.type}</span>
+            <span className="font-medium">{tempLanguage}</span> •
+            <span className="font-medium"> {currentVoice?.type}</span> •
+            <span className="font-medium"> {currentVoice?.gender}</span>
+          </p>
+          <p className="text-xs text-boostyBlack opacity-50 mt-1">
+            Voice {currentVoiceIndex + 1} of {voices.length}
           </p>
         </div>
 
@@ -378,24 +422,23 @@ const VoiceSettings = () => {
         <div className="flex space-x-4">
           <button
             onClick={handleDone}
-            className="px-8 py-3 bg-[#202D2D] text-[#F5C13C] rounded-full font-semibold"
+            className="px-8 py-3 bg-[#202D2D] text-[#F5C13C] rounded-full font-semibold hover:bg-[#1a2424] transition-colors"
             disabled={isPlaying}
           >
             Done
           </button>
           <button
             onClick={handleCancel}
-            className="px-8 py-3 bg-[#E8F2F2] border-[2px] border-[#374646] text-[#202D2D] rounded-full font-bold"
+            className="px-8 py-3 bg-[#E8F2F2] border-[2px] border-[#374646] text-[#202D2D] rounded-full font-bold hover:bg-[#dde7e7] transition-colors"
           >
             Cancel
           </button>
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         @keyframes soundwave-bounce {
-          0%,
-          100% {
+          0%, 100% {
             transform: scaleY(1);
           }
           50% {

@@ -7,6 +7,7 @@ import {
   useRecommendationSubmit,
   useRecommendation,
 } from "../context/RecommendationContext";
+import { API_ENDPOINTS } from "../config/api";
 
 const VoiceAssistant = () => {
   const navigate = useNavigate();
@@ -60,9 +61,15 @@ const VoiceAssistant = () => {
   const timeoutRef = useRef(null);
   const currentAudioRef = useRef(null);
 
-  // Initialize speech synthesis (RESTORED from original)
+  // ENHANCE your existing useEffect (around line 61)
   useEffect(() => {
     synthRef.current = window.speechSynthesis;
+
+    // Add cleanup tracking
+    const cleanupRefs = {
+      abortControllers: new Set(),
+      timers: new Set(),
+    };
 
     if (!synthRef.current) {
       console.error("Speech synthesis not supported in this browser");
@@ -86,7 +93,14 @@ const VoiceAssistant = () => {
       console.log("Page ready for interaction");
     }, 2000);
 
+    cleanupRefs.timers.add(readyTimer); // Track timer
+
     return () => {
+      // Your existing cleanup is good, just add:
+      cleanupRefs.abortControllers.forEach((controller) => controller.abort());
+      cleanupRefs.timers.forEach((timer) => clearTimeout(timer));
+
+      // Rest of your existing cleanup...
       if (synthRef.current) {
         synthRef.current.cancel();
       }
@@ -111,7 +125,6 @@ const VoiceAssistant = () => {
       });
 
       console.log("🧹 Voice assistant cleanup completed");
-      clearTimeout(readyTimer);
     };
   }, []);
 
@@ -127,12 +140,17 @@ const VoiceAssistant = () => {
     }
   }, [error]);
 
-  // RESTORED: Real speech functions from original
   const speakTextWithGoogleTTS = async (text) => {
     try {
       console.log("🎙️ Trying Google Cloud TTS...");
 
-      const response = await fetch("http://localhost:3001/api/tts/speak", {
+      // Add AbortController
+      const abortController = new AbortController();
+
+      // Store controller reference for cleanup
+      const originalAudio = currentAudioRef.current;
+
+      const response = await fetch(API_ENDPOINTS.TTS_SPEAK, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -143,6 +161,7 @@ const VoiceAssistant = () => {
           gender: settings.gender,
           language: settings.language,
         }),
+        signal: abortController.signal, // Add this line
       });
 
       if (!response.ok) {
@@ -155,6 +174,13 @@ const VoiceAssistant = () => {
       const audioUrl = URL.createObjectURL(audioBlob);
 
       return new Promise((resolve, reject) => {
+        // Check if component is still mounted
+        if (isNavigating || !synthRef.current) {
+          URL.revokeObjectURL(audioUrl);
+          resolve();
+          return;
+        }
+
         const audio = new Audio(audioUrl);
         audio.volume = volume;
 
@@ -168,27 +194,37 @@ const VoiceAssistant = () => {
         audio.onended = () => {
           console.log("✅ Google TTS speech ended");
           URL.revokeObjectURL(audioUrl);
-          currentAudioRef.current = null;
+          if (currentAudioRef.current === audio) {
+            currentAudioRef.current = null;
+          }
           resolve();
         };
 
         audio.onerror = (error) => {
           console.error("❌ Audio playback error:", error);
           URL.revokeObjectURL(audioUrl);
-          currentAudioRef.current = null;
+          if (currentAudioRef.current === audio) {
+            currentAudioRef.current = null;
+          }
           reject(error);
         };
 
         audio.onpause = () => {
           console.log("⏸️ Google TTS speech cancelled");
           URL.revokeObjectURL(audioUrl);
-          currentAudioRef.current = null;
+          if (currentAudioRef.current === audio) {
+            currentAudioRef.current = null;
+          }
           resolve();
         };
 
         audio.play().catch(reject);
       });
     } catch (error) {
+      if (error.name === "AbortError") {
+        console.log("🔇 TTS request aborted");
+        return;
+      }
       console.log("❌ Google TTS failed:", error.message);
       throw error;
     }

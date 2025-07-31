@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from "react";
+import { API_ENDPOINTS } from "../config/api";
 
 // Create the context
 const RecommendationContext = createContext();
@@ -11,7 +12,7 @@ export const RecommendationProvider = ({ children }) => {
 
   // API call function
   const makeRecommendationAPICall = async (applianceData) => {
-    const response = await fetch("http://localhost:3001/api/recommendations", {
+    const response = await fetch(API_ENDPOINTS.RECOMMENDATIONS, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -29,36 +30,43 @@ export const RecommendationProvider = ({ children }) => {
     return await response.json();
   };
 
-  // Main function to get recommendation
   const getRecommendation = async (applianceData) => {
     try {
       setIsLoading(true);
       setError(null);
 
-      // Validate required fields
-      if (!applianceData.nameOfItem || !applianceData.wattage) {
-        throw new Error("Appliance name and wattage are required");
+      // Create AbortController for this request
+      const abortController = new AbortController();
+
+      // Store the controller to cancel if component unmounts
+      const cleanup = () => abortController.abort();
+
+      const response = await fetch(API_ENDPOINTS.RECOMMENDATIONS, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: [applianceData] }),
+        signal: abortController.signal, // Add abort signal
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
       }
 
-      console.log("Getting recommendation for:", applianceData);
+      const result = await response.json();
 
-      // Make API call
-      const result = await makeRecommendationAPICall(applianceData);
-
-      console.log("Recommendation result:", result);
-
-      // Validate response
-      if (!result.success || !result.recommendation) {
-        throw new Error("Invalid recommendation response");
+      // Only update state if request wasn't aborted
+      if (!abortController.signal.aborted) {
+        setRecommendationResult(result);
       }
 
-      // Store the result
-      setRecommendationResult(result);
       return result;
     } catch (err) {
-      console.error("Failed to get recommendation:", err);
-      setError(err.message);
-      throw err; // Re-throw so caller can handle if needed
+      // Don't set error if request was intentionally aborted
+      if (err.name !== "AbortError") {
+        console.error("Failed to get recommendation:", err);
+        setError(err.message);
+        throw err;
+      }
     } finally {
       setIsLoading(false);
     }

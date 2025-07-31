@@ -1,10 +1,13 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { API_ENDPOINTS } from "../config/api";
 
-// Async thunk for syncing user with backend after Clerk authentication
+// In authSlice.js, enhance the error handling
 export const syncUserWithBackend = createAsyncThunk(
   "auth/syncUserWithBackend",
   async (userData, { rejectWithValue }) => {
     try {
+      console.log("🚀 Attempting backend sync...");
+
       const response = await fetch(
         "https://boosty-2025-backend.vercel.app/api/auth/clerk-sync",
         {
@@ -22,13 +25,25 @@ export const syncUserWithBackend = createAsyncThunk(
         }
       );
 
+      // 🔍 ADD DETAILED ERROR LOGGING
       if (!response.ok) {
-        throw new Error("Failed to sync user with backend");
+        const errorText = await response.text();
+        console.error("❌ Backend sync failed:", {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText,
+          headers: Object.fromEntries(response.headers.entries()),
+        });
+        throw new Error(
+          `Backend sync failed: ${response.status} - ${errorText}`
+        );
       }
 
       const data = await response.json();
+      console.log("✅ Backend sync successful:", data);
       return data;
     } catch (error) {
+      console.error("❌ Sync error:", error);
       return rejectWithValue(error.message);
     }
   }

@@ -20,7 +20,6 @@ const ClerkAuthProvider = ({ children }) => {
         dispatch(setLoading(false));
 
         if (user) {
-          // Set user in Redux store
           const userData = {
             id: user.id,
             email: user.primaryEmailAddress?.emailAddress,
@@ -35,10 +34,17 @@ const ClerkAuthProvider = ({ children }) => {
 
           dispatch(setUser(userData));
 
-          // Sync with backend if not already synced
           if (syncStatus === "idle") {
             try {
               const clerkToken = await getToken();
+
+              // 🔍 ADD DEBUG LOGGING
+              console.log(
+                "🔑 Clerk token:",
+                clerkToken ? "Present" : "Missing"
+              );
+              console.log("📤 Sending sync request with user data:", userData);
+
               dispatch(
                 syncUserWithBackend({
                   ...userData,
@@ -46,7 +52,7 @@ const ClerkAuthProvider = ({ children }) => {
                 })
               );
             } catch (error) {
-              console.error("Failed to get Clerk token:", error);
+              console.error("❌ Failed to get Clerk token:", error);
             }
           }
         } else {

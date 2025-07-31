@@ -21,6 +21,7 @@ import { VoiceSettingsProvider } from "./context/VoiceSettingsContext";
 import VoiceSettings from "./pages/VoiceSettings";
 import { RecommendationProvider } from "./context/RecommendationContext";
 import RecommendationResults from "./pages/RecommendationResults";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 // Component that handles routing logic - INSIDE Router context
 const AppContent = () => {
@@ -67,19 +68,21 @@ const AppContent = () => {
 // Main App component - provides Router context
 const App = () => {
   return (
-    <div className="overflow-x-hidden font-openSans">
-      <Provider store={store}>
-        <ClerkAuthProvider>
-          <VoiceSettingsProvider>
-            <RecommendationProvider>
-              <Router>
-                <AppContent />
-              </Router>
-            </RecommendationProvider>
-          </VoiceSettingsProvider>
-        </ClerkAuthProvider>
-      </Provider>
-    </div>
+    <ErrorBoundary>
+      <div className="overflow-x-hidden font-openSans">
+        <Provider store={store}>
+          <ClerkAuthProvider>
+            <VoiceSettingsProvider>
+              <RecommendationProvider>
+                <Router>
+                  <AppContent />
+                </Router>
+              </RecommendationProvider>
+            </VoiceSettingsProvider>
+          </ClerkAuthProvider>
+        </Provider>
+      </div>
+    </ErrorBoundary>
   );
 };
 

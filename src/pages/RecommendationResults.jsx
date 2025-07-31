@@ -1,12 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useUser, useClerk } from "@clerk/clerk-react";
 import { useSelector } from "react-redux";
 import { useRecommendation } from "../context/RecommendationContext";
 import { useNavigate } from "react-router-dom";
+import AddressModal from "../components/AddressModal";
+import { API_ENDPOINTS } from "../config/api";
 
 const RecommendationResults = () => {
   // Actual auth data from your Redux store and Clerk
-  const { user: clerkUser, isSignedIn } = useUser();
+  const { user: clerkUser, isSignedIn, getToken } = useUser();
   const { openSignIn } = useClerk();
   const { user: reduxUser, isAuthenticated } = useSelector(
     (state) => state.auth
@@ -23,6 +25,81 @@ const RecommendationResults = () => {
 
   // Local state
   const [paymentMethod, setPaymentMethod] = useState(""); // "" | "debit" | "installment"
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [userAddress, setUserAddress] = useState(null);
+  const [addressLoading, setAddressLoading] = useState(false);
+
+  // Get user token for API calls
+  const getUserToken = async () => {
+    try {
+      if (isSignedIn) {
+        return await getToken();
+      }
+      return null;
+    } catch (error) {
+      console.error("Failed to get user token:", error);
+      return null;
+    }
+  };
+
+  // Load user's current address on component mount
+  useEffect(() => {
+    if (isSignedIn) {
+      loadUserAddress();
+    }
+  }, [isSignedIn]);
+
+  const loadUserAddress = async () => {
+    setAddressLoading(true);
+    try {
+      const token = await getUserToken();
+      if (!token) return;
+
+      const response = await fetch(API_ENDPOINTS.USER_ADDRESS, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (result.success && result.hasAddress) {
+        setUserAddress(result.address);
+      } else {
+        // Try to get address from recommendation result
+        const recommendationAddress =
+          recommendationResult?.locationProfile?.location;
+        if (recommendationAddress?.fullAddress) {
+          setUserAddress({
+            fullAddress: recommendationAddress.fullAddress,
+            city: recommendationAddress.city,
+            state: recommendationAddress.region,
+            country: recommendationAddress.country,
+            source: recommendationAddress.addressSource || "estimated",
+            accuracy: recommendationAddress.addressAccuracy || "approximate",
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load user address:", error);
+
+      // Fallback to recommendation location data
+      const recommendationAddress =
+        recommendationResult?.locationProfile?.location;
+      if (recommendationAddress?.fullAddress) {
+        setUserAddress({
+          fullAddress: recommendationAddress.fullAddress,
+          city: recommendationAddress.city,
+          state: recommendationAddress.region,
+          country: recommendationAddress.country,
+          source: recommendationAddress.addressSource || "estimated",
+          accuracy: recommendationAddress.addressAccuracy || "approximate",
+        });
+      }
+    } finally {
+      setAddressLoading(false);
+    }
+  };
 
   // Handle case where no recommendation data
   if (!hasRecommendation || !recommendationResult) {
@@ -34,8 +111,8 @@ const RecommendationResults = () => {
           </h2>
           <p className="text-[#3D3E3E] mb-4">
             {settings.language === "Pidgin"
-              ? "You're going back to fill the applainces form to get new recommendations"
-              : "You're going back to fill the applainces form to get new recommendations"}
+              ? "You're going back to fill the appliances form to get new recommendations"
+              : "You're going back to fill the appliances form to get new recommendations"}
           </p>
           <button
             onClick={() => navigate("/voice-assistant")}
@@ -51,31 +128,6 @@ const RecommendationResults = () => {
   const { components, pricing, performance } =
     recommendationResult.recommendation;
 
-  // Get user address - only show if it actually exists
-  const getUserAddress = () => {
-    // Try to get address from Clerk user metadata or Redux user
-    const clerkAddress =
-      clerkUser?.unsafeMetadata?.address ||
-      clerkUser?.publicMetadata?.address ||
-      clerkUser?.privateMetadata?.address;
-
-    const reduxAddress = reduxUser?.address;
-
-    // Return the address if found, otherwise return null
-    if (clerkAddress) {
-      return clerkAddress;
-    }
-
-    if (reduxAddress) {
-      return reduxAddress;
-    }
-
-    // No address found
-    return null;
-  };
-
-  const address = getUserAddress();
-
   const handleTapToTalk = () => {
     const totalAmount = pricing.totalAmount;
     const priceGuidanceText =
@@ -88,16 +140,27 @@ const RecommendationResults = () => {
 
   const handleRecalculate = () => {
     resetRecommendation();
-    console.log("Navigate back to voice assistant");
+    navigate("/voice-assistant");
   };
 
   const handlePaymentMethodChange = (method) => {
     setPaymentMethod(method);
   };
 
-  const handleAddDebitCard = () => {
-    // TODO: Implement debit card modal/flow
-    console.log("Add debit card clicked - implement later");
+  const handleChangeAddress = () => {
+    if (!isSignedIn) {
+      openSignIn({
+        afterSignInUrl: "/recommendation-results",
+        afterSignUpUrl: "/recommendation-results",
+      });
+      return;
+    }
+    setShowAddressModal(true);
+  };
+
+  const handleAddressUpdated = (newAddress) => {
+    setUserAddress(newAddress);
+    console.log("✅ Address updated in UI:", newAddress);
   };
 
   const handlePrimaryAction = () => {
@@ -133,6 +196,55 @@ const RecommendationResults = () => {
   };
 
   const showFinancingText = paymentMethod === "installment";
+
+  const renderAddress = () => {
+    if (addressLoading) {
+      return (
+        <div className="text-sm text-[#3D3E3E]">
+          <div className="animate-pulse">
+            <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+          </div>
+        </div>
+      );
+    }
+
+    if (userAddress) {
+      return (
+        <div className="text-sm text-[#3D3E3E]">
+          <p className="font-medium">
+            {reduxUser?.fullName || clerkUser?.fullName || ""}
+          </p>
+          {userAddress.street && <p>{userAddress.street}</p>}
+          {userAddress.neighbourhood && <p>{userAddress.neighbourhood}</p>}
+          <p>
+            {userAddress.city}
+            {userAddress.state ? `, ${userAddress.state}` : ""}
+          </p>
+          {userAddress.country && <p>{userAddress.country}</p>}
+          {userAddress.postcode && <p>{userAddress.postcode}</p>}
+
+          {/* Show address accuracy indicator */}
+          {userAddress.accuracy && userAddress.accuracy !== "exact" && (
+            <p className="text-xs text-gray-500 mt-1 italic">
+              {userAddress.accuracy === "approximate"
+                ? "📍 Approximate location"
+                : "🏙️ City-level location"}
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="text-sm text-[#3D3E3E]">
+        <p>{isSignedIn ? "No address provided" : "Sign in to add address"}</p>
+        <p className="text-xs text-gray-500 mt-1 italic">
+          Using estimated location for recommendations
+        </p>
+      </div>
+    );
+  };
 
   return (
     <div className="fixed inset-0 bg-yellow-400 bg-opacity-95 flex items-center justify-center z-50 p-4">
@@ -192,26 +304,13 @@ const RecommendationResults = () => {
 
         {/* 1. Address */}
         <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-start justify-between mb-2">
             <h3 className="font-bold text-[#2B2D2C]">1. Address</h3>
-            <div className="text-sm text-[#3D3E3E]">
-              {address ? (
-                <>
-                  <p className="font-medium">
-                    {address.name ||
-                      reduxUser?.fullName ||
-                      clerkUser?.fullName ||
-                      ""}
-                  </p>
-                  <p>{address.street || ""}</p>
-                  <p>{address.city || ""}</p>
-                  <p>{address.zipCode || ""}</p>
-                </>
-              ) : (
-                <p className="text-[#3D3E3E]">Address not found</p>
-              )}
-            </div>
-            <button className="text-[#202D2D] font-bold hover:underline">
+            <div className="flex-1 mx-4">{renderAddress()}</div>
+            <button
+              onClick={handleChangeAddress}
+              className="text-[#202D2D] font-bold hover:underline flex-shrink-0"
+            >
               Change
             </button>
           </div>
@@ -394,6 +493,14 @@ const RecommendationResults = () => {
           </div>
         </div>
       </div>
+
+      {/* Address Modal */}
+      <AddressModal
+        isOpen={showAddressModal}
+        onClose={() => setShowAddressModal(false)}
+        onAddressUpdated={handleAddressUpdated}
+        userToken={getUserToken}
+      />
     </div>
   );
 };

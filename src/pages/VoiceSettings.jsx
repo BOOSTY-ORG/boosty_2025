@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useVoiceSettings } from "../context/VoiceSettingsContext";
+import { API_ENDPOINTS } from "../config/api";
 
 const VoiceSettings = () => {
   const navigate = useNavigate();
@@ -186,7 +187,7 @@ const VoiceSettings = () => {
         language
       );
 
-      const response = await fetch("http://localhost:3001/api/tts/speak", {
+      const response = await fetch(API_ENDPOINTS.TTS_SPEAK, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

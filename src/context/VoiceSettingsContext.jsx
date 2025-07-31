@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect } from "react";
+import { safeStorage } from "../utils/safeStorage";
 
 // Default voice settings with American male as default
 const defaultSettings = {
@@ -94,18 +95,16 @@ export const VoiceSettingsProvider = ({ children }) => {
     defaultSettings
   );
 
-  // Load settings from localStorage on mount
   useEffect(() => {
-    try {
-      const savedSettings = localStorage.getItem("boosty-voice-settings");
-      if (savedSettings) {
-        const parsed = JSON.parse(savedSettings);
-        dispatch({ type: VOICE_ACTIONS.LOAD_SETTINGS, payload: parsed });
-      }
-    } catch (error) {
-      console.warn("Failed to load voice settings from localStorage:", error);
+    const savedSettings = safeStorage.get("boosty-voice-settings");
+    if (savedSettings) {
+      dispatch({ type: VOICE_ACTIONS.LOAD_SETTINGS, payload: savedSettings });
     }
   }, []);
+
+  useEffect(() => {
+    safeStorage.set("boosty-voice-settings", settings);
+  }, [settings]);
 
   // Save settings to localStorage whenever they change
   useEffect(() => {

@@ -1,15 +1,18 @@
-const API_CONFIG = {
-  BASE_URL: import.meta.env.VITE_API_BASE_URL || "http://localhost:3001",
-  BACKEND_URL:
-    import.meta.env.VITE_BACKEND_URL ||
-    "https://boosty-2025-backend.vercel.app",
-};
+// config/api.js - Updated configuration
+
+const BASE_URL = "http://localhost:3001";
 
 export const API_ENDPOINTS = {
-  RECOMMENDATIONS: `${API_CONFIG.BASE_URL}/api/recommendations`,
-  TTS_SPEAK: `${API_CONFIG.BASE_URL}/api/tts/speak`,
-  AUTH_SYNC: `${API_CONFIG.BACKEND_URL}/api/auth/clerk-sync`,
-  // Address management endpoints
-  USER_ADDRESS: `${API_CONFIG.BASE_URL}/api/recommendations/user/address`,
-  UPDATE_ADDRESS: `${API_CONFIG.BASE_URL}/api/recommendations/user/address`,
+  BASE_URL,
+
+  // Existing endpoints
+  TTS_SPEAK: `${BASE_URL}/api/tts/speak`,
+  RECOMMENDATIONS: `${BASE_URL}/api/recommendations`,
+  USER_ADDRESS: `${BASE_URL}/api/user/address`,
+
+  // Conversation endpoints
+  CONVERSATION: `${BASE_URL}/api/conversation/conversation`,
+  SPEECH_TO_TEXT: `${BASE_URL}/api/conversation/speech-to-text`,
+  SOLAR_KNOWLEDGE: `${BASE_URL}/api/conversation/solar-knowledge`,
+  APPLIANCES: `${BASE_URL}/api/conversation/appliances`,
 };

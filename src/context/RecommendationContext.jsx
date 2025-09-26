@@ -1,12 +1,41 @@
 import React, { createContext, useContext, useState } from "react";
 import { API_ENDPOINTS } from "../config/api";
 
+const STORAGE_KEY = "boosty_recommendation_results";
+
 // Create the context
 const RecommendationContext = createContext();
 
 // Context provider component
 export const RecommendationProvider = ({ children }) => {
-  const [recommendationResult, setRecommendationResult] = useState(null);
+  const saveToStorage = (data) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (error) {
+      console.error("Failed to save recommendation to localStorage:", error);
+    }
+  };
+
+  const loadFromStorage = () => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : null;
+    } catch (error) {
+      console.error("Failed to load recommendation from localStorage:", error);
+      return null;
+    }
+  };
+
+  const clearStorage = () => {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (error) {
+      console.error("Failed to clear recommendation from localStorage:", error);
+    }
+  };
+  const [recommendationResult, setRecommendationResult] = useState(() => {
+    return loadFromStorage();
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -57,6 +86,7 @@ export const RecommendationProvider = ({ children }) => {
       // Only update state if request wasn't aborted
       if (!abortController.signal.aborted) {
         setRecommendationResult(result);
+        saveToStorage(result); // ADD this line
       }
 
       return result;
@@ -72,11 +102,11 @@ export const RecommendationProvider = ({ children }) => {
     }
   };
 
-  // Reset recommendation state
   const resetRecommendation = () => {
     setRecommendationResult(null);
     setError(null);
     setIsLoading(false);
+    clearStorage(); // ADD this line
   };
 
   // Clear error

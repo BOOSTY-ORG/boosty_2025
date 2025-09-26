@@ -2,7 +2,219 @@ import React, { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { API_ENDPOINTS } from "../config/api";
 
-const AddressModal = ({ isOpen, onClose, onAddressUpdated, userToken }) => {
+// Country-specific data
+const COUNTRIES = {
+  Nigeria: {
+    code: "NG",
+    states: [
+      "Abia",
+      "Adamawa",
+      "Akwa Ibom",
+      "Anambra",
+      "Bauchi",
+      "Bayelsa",
+      "Benue",
+      "Borno",
+      "Cross River",
+      "Delta",
+      "Ebonyi",
+      "Edo",
+      "Ekiti",
+      "Enugu",
+      "Federal Capital Territory",
+      "Gombe",
+      "Imo",
+      "Jigawa",
+      "Kaduna",
+      "Kano",
+      "Katsina",
+      "Kebbi",
+      "Kogi",
+      "Kwara",
+      "Lagos",
+      "Nasarawa",
+      "Niger",
+      "Ogun",
+      "Ondo",
+      "Osun",
+      "Oyo",
+      "Plateau",
+      "Rivers",
+      "Sokoto",
+      "Taraba",
+      "Yobe",
+      "Zamfara",
+    ],
+    stateLabel: "State",
+    postcodeLabel: "Postcode",
+  },
+  Ghana: {
+    code: "GH",
+    states: [
+      "Ashanti",
+      "Brong-Ahafo",
+      "Central",
+      "Eastern",
+      "Greater Accra",
+      "Northern",
+      "Upper East",
+      "Upper West",
+      "Volta",
+      "Western",
+    ],
+    stateLabel: "Region",
+    postcodeLabel: "Postcode",
+  },
+  Kenya: {
+    code: "KE",
+    states: [
+      "Baringo",
+      "Bomet",
+      "Bungoma",
+      "Busia",
+      "Elgeyo-Marakwet",
+      "Embu",
+      "Garissa",
+      "Homa Bay",
+      "Isiolo",
+      "Kajiado",
+      "Kakamega",
+      "Kericho",
+      "Kiambu",
+      "Kilifi",
+      "Kirinyaga",
+      "Kisii",
+      "Kisumu",
+      "Kitui",
+      "Kwale",
+      "Laikipia",
+      "Lamu",
+      "Machakos",
+      "Makueni",
+      "Mandera",
+      "Marsabit",
+      "Meru",
+      "Migori",
+      "Mombasa",
+      "Murang'a",
+      "Nairobi",
+      "Nakuru",
+      "Nandi",
+      "Narok",
+      "Nyamira",
+      "Nyandarua",
+      "Nyeri",
+      "Samburu",
+      "Siaya",
+      "Taita-Taveta",
+      "Tana River",
+      "Tharaka-Nithi",
+      "Trans Nzoia",
+      "Turkana",
+      "Uasin Gishu",
+      "Vihiga",
+      "Wajir",
+      "West Pokot",
+    ],
+    stateLabel: "County",
+    postcodeLabel: "Postal Code",
+  },
+  "South Africa": {
+    code: "ZA",
+    states: [
+      "Eastern Cape",
+      "Free State",
+      "Gauteng",
+      "KwaZulu-Natal",
+      "Limpopo",
+      "Mpumalanga",
+      "North West",
+      "Northern Cape",
+      "Western Cape",
+    ],
+    stateLabel: "Province",
+    postcodeLabel: "Postal Code",
+  },
+  "United States": {
+    code: "US",
+    states: [
+      "Alabama",
+      "Alaska",
+      "Arizona",
+      "Arkansas",
+      "California",
+      "Colorado",
+      "Connecticut",
+      "Delaware",
+      "Florida",
+      "Georgia",
+      "Hawaii",
+      "Idaho",
+      "Illinois",
+      "Indiana",
+      "Iowa",
+      "Kansas",
+      "Kentucky",
+      "Louisiana",
+      "Maine",
+      "Maryland",
+      "Massachusetts",
+      "Michigan",
+      "Minnesota",
+      "Mississippi",
+      "Missouri",
+      "Montana",
+      "Nebraska",
+      "Nevada",
+      "New Hampshire",
+      "New Jersey",
+      "New Mexico",
+      "New York",
+      "North Carolina",
+      "North Dakota",
+      "Ohio",
+      "Oklahoma",
+      "Oregon",
+      "Pennsylvania",
+      "Rhode Island",
+      "South Carolina",
+      "South Dakota",
+      "Tennessee",
+      "Texas",
+      "Utah",
+      "Vermont",
+      "Virginia",
+      "Washington",
+      "West Virginia",
+      "Wisconsin",
+      "Wyoming",
+    ],
+    stateLabel: "State",
+    postcodeLabel: "ZIP Code",
+  },
+  "United Kingdom": {
+    code: "GB",
+    states: ["England", "Scotland", "Wales", "Northern Ireland"],
+    stateLabel: "Country",
+    postcodeLabel: "Postcode",
+  },
+};
+
+const DEFAULT_COUNTRIES = [
+  "Nigeria",
+  "Ghana",
+  "Kenya",
+  "South Africa",
+  "United States",
+  "United Kingdom",
+];
+
+const AddressModal = ({
+  isOpen,
+  onClose,
+  onAddressUpdated,
+  getTokenFunction,
+}) => {
   const [addressData, setAddressData] = useState({
     street: "",
     neighbourhood: "",
@@ -15,46 +227,57 @@ const AddressModal = ({ isOpen, onClose, onAddressUpdated, userToken }) => {
   const [error, setError] = useState("");
   const [isLoadingCurrent, setIsLoadingCurrent] = useState(false);
 
+  // Get current country data
+  const currentCountryData = COUNTRIES[addressData.country];
+  const isStateRequired =
+    currentCountryData && currentCountryData.states.length > 0;
+
+  // Load current address when modal opens
   useEffect(() => {
-    if (isOpen && userToken) {
+    if (isOpen && getTokenFunction) {
       loadCurrentAddress();
     }
-  }, [isOpen, userToken]);
+  }, [isOpen, getTokenFunction]);
 
   const loadCurrentAddress = async () => {
     setIsLoadingCurrent(true);
     try {
-      const response = await fetch(API_ENDPOINTS.USER_ADDRESS, {
-        headers: {
-          Authorization: `Bearer ${userToken}`,
-        },
-      });
-
-      const result = await response.json();
-
-      if (result.success && result.hasAddress) {
+      // Load from localStorage first
+      const savedAddress = localStorage.getItem("boosty_user_address");
+      if (savedAddress) {
+        const addressData = JSON.parse(savedAddress);
         setAddressData({
-          street: result.address.street || "",
-          neighbourhood: result.address.neighbourhood || "",
-          city: result.address.city || "",
-          state: result.address.state || "",
-          country: result.address.country || "Nigeria",
-          postcode: result.address.postcode || "",
+          street: addressData.street || "",
+          neighbourhood: addressData.neighbourhood || "",
+          city: addressData.city || "",
+          state: addressData.state || "",
+          country: addressData.country || "Nigeria",
+          postcode: addressData.postcode || "",
         });
+        console.log("✅ Address loaded from localStorage");
       }
     } catch (error) {
-      console.error("Failed to load current address:", error);
+      console.log("Failed to load address from localStorage:", error);
     } finally {
       setIsLoadingCurrent(false);
     }
   };
 
   const handleInputChange = (field, value) => {
-    setAddressData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-    setError(""); 
+    // If country changes, reset state to empty
+    if (field === "country") {
+      setAddressData((prev) => ({
+        ...prev,
+        [field]: value,
+        state: "", // Reset state when country changes
+      }));
+    } else {
+      setAddressData((prev) => ({
+        ...prev,
+        [field]: value,
+      }));
+    }
+    setError(""); // Clear error when user starts typing
   };
 
   const validateAddress = () => {
@@ -66,10 +289,28 @@ const AddressModal = ({ isOpen, onClose, onAddressUpdated, userToken }) => {
       setError("City is required");
       return false;
     }
-    if (!addressData.state.trim()) {
-      setError("State is required");
+
+    // Check if country is selected or custom country is provided
+    const finalCountry =
+      addressData.country === ""
+        ? addressData.customCountry
+        : addressData.country;
+    if (!finalCountry || !finalCountry.trim()) {
+      setError("Country is required");
       return false;
     }
+
+    // Only require state if the country has states defined and it's not a custom country
+    if (
+      addressData.country !== "" &&
+      isStateRequired &&
+      !addressData.state.trim()
+    ) {
+      const stateLabel = currentCountryData.stateLabel || "State";
+      setError(`${stateLabel} is required for ${addressData.country}`);
+      return false;
+    }
+
     return true;
   };
 
@@ -84,39 +325,42 @@ const AddressModal = ({ isOpen, onClose, onAddressUpdated, userToken }) => {
     setError("");
 
     try {
-      const response = await fetch(API_ENDPOINTS.UPDATE_ADDRESS, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${userToken}`,
-        },
-        body: JSON.stringify({
-          address: addressData,
-        }),
+      // Save address to localStorage
+      const addressToSave = {
+        street: addressData.street,
+        neighbourhood: addressData.neighbourhood,
+        city: addressData.city,
+        state: addressData.state,
+        country: addressData.country,
+        postcode: addressData.postcode,
+        fullAddress: `${addressData.street}, ${addressData.city}, ${addressData.state}, ${addressData.country}`,
+        source: "user_input",
+        accuracy: "exact",
+        updatedAt: new Date().toISOString(),
+      };
+
+      localStorage.setItem(
+        "boosty_user_address",
+        JSON.stringify(addressToSave)
+      );
+      console.log("✅ Address saved to localStorage");
+
+      // Update the UI immediately
+      onAddressUpdated(addressToSave);
+      onClose();
+
+      // Reset form
+      setAddressData({
+        street: "",
+        neighbourhood: "",
+        city: "",
+        state: "",
+        country: "Nigeria",
+        postcode: "",
       });
-
-      const result = await response.json();
-
-      if (result.success) {
-        console.log("✅ Address updated successfully");
-        onAddressUpdated(result.address);
-        onClose();
-
-        // Reset form
-        setAddressData({
-          street: "",
-          neighbourhood: "",
-          city: "",
-          state: "",
-          country: "Nigeria",
-          postcode: "",
-        });
-      } else {
-        setError(result.message || "Failed to update address");
-      }
     } catch (error) {
-      console.error("Address update error:", error);
-      setError("Failed to update address. Please try again.");
+      console.error("Address save error:", error);
+      setError("Failed to save address. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -192,6 +436,26 @@ const AddressModal = ({ isOpen, onClose, onAddressUpdated, userToken }) => {
             />
           </div>
 
+          {/* Country */}
+          <div>
+            <label className="block text-sm font-semibold text-[#3D3E3E] mb-2">
+              Country *
+            </label>
+            <select
+              value={addressData.country}
+              onChange={(e) => handleInputChange("country", e.target.value)}
+              className="w-full px-3 py-2 border border-[#A6A0A3] rounded-lg focus:outline-none focus:ring-2 focus:ring-boostyYellow focus:border-transparent"
+              required
+            >
+              <option value="">Select Country</option>
+              {DEFAULT_COUNTRIES.map((countryName) => (
+                <option key={countryName} value={countryName}>
+                  {countryName}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* City and State */}
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -202,89 +466,60 @@ const AddressModal = ({ isOpen, onClose, onAddressUpdated, userToken }) => {
                 type="text"
                 value={addressData.city}
                 onChange={(e) => handleInputChange("city", e.target.value)}
-                placeholder="Lagos"
+                placeholder="Enter city"
                 className="w-full px-3 py-2 border border-[#A6A0A3] rounded-lg focus:outline-none focus:ring-2 focus:ring-boostyYellow focus:border-transparent"
                 required
               />
             </div>
             <div>
               <label className="block text-sm font-semibold text-[#3D3E3E] mb-2">
-                State *
+                {currentCountryData
+                  ? currentCountryData.stateLabel
+                  : "State/Province"}
               </label>
-              <select
-                value={addressData.state}
-                onChange={(e) => handleInputChange("state", e.target.value)}
-                className="w-full px-3 py-2 border border-[#A6A0A3] rounded-lg focus:outline-none focus:ring-2 focus:ring-boostyYellow focus:border-transparent"
-                required
-              >
-                <option value="">Select State</option>
-                <option value="Abia">Abia</option>
-                <option value="Adamawa">Adamawa</option>
-                <option value="Akwa Ibom">Akwa Ibom</option>
-                <option value="Anambra">Anambra</option>
-                <option value="Bauchi">Bauchi</option>
-                <option value="Bayelsa">Bayelsa</option>
-                <option value="Benue">Benue</option>
-                <option value="Borno">Borno</option>
-                <option value="Cross River">Cross River</option>
-                <option value="Delta">Delta</option>
-                <option value="Ebonyi">Ebonyi</option>
-                <option value="Edo">Edo</option>
-                <option value="Ekiti">Ekiti</option>
-                <option value="Enugu">Enugu</option>
-                <option value="FCT">Federal Capital Territory</option>
-                <option value="Gombe">Gombe</option>
-                <option value="Imo">Imo</option>
-                <option value="Jigawa">Jigawa</option>
-                <option value="Kaduna">Kaduna</option>
-                <option value="Kano">Kano</option>
-                <option value="Katsina">Katsina</option>
-                <option value="Kebbi">Kebbi</option>
-                <option value="Kogi">Kogi</option>
-                <option value="Kwara">Kwara</option>
-                <option value="Lagos">Lagos</option>
-                <option value="Nasarawa">Nasarawa</option>
-                <option value="Niger">Niger</option>
-                <option value="Ogun">Ogun</option>
-                <option value="Ondo">Ondo</option>
-                <option value="Osun">Osun</option>
-                <option value="Oyo">Oyo</option>
-                <option value="Plateau">Plateau</option>
-                <option value="Rivers">Rivers</option>
-                <option value="Sokoto">Sokoto</option>
-                <option value="Taraba">Taraba</option>
-                <option value="Yobe">Yobe</option>
-                <option value="Zamfara">Zamfara</option>
-              </select>
+              {currentCountryData && currentCountryData.states.length > 0 ? (
+                <select
+                  value={addressData.state}
+                  onChange={(e) => handleInputChange("state", e.target.value)}
+                  className="w-full px-3 py-2 border border-[#A6A0A3] rounded-lg focus:outline-none focus:ring-2 focus:ring-boostyYellow focus:border-transparent"
+                >
+                  <option value="">
+                    Select {currentCountryData.stateLabel}
+                  </option>
+                  {currentCountryData.states.map((state, index) => (
+                    <option key={index} value={state}>
+                      {state}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={addressData.state}
+                  onChange={(e) => handleInputChange("state", e.target.value)}
+                  placeholder={`Enter ${
+                    currentCountryData
+                      ? currentCountryData.stateLabel.toLowerCase()
+                      : "state/province"
+                  }`}
+                  className="w-full px-3 py-2 border border-[#A6A0A3] rounded-lg focus:outline-none focus:ring-2 focus:ring-boostyYellow focus:border-transparent"
+                />
+              )}
             </div>
           </div>
 
-          {/* Country and Postcode */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-[#3D3E3E] mb-2">
-                Country
-              </label>
-              <input
-                type="text"
-                value={addressData.country}
-                onChange={(e) => handleInputChange("country", e.target.value)}
-                className="w-full px-3 py-2 border border-[#A6A0A3] rounded-lg focus:outline-none focus:ring-2 focus:ring-boostyYellow focus:border-transparent bg-gray-50"
-                readOnly
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-[#3D3E3E] mb-2">
-                Postcode
-              </label>
-              <input
-                type="text"
-                value={addressData.postcode}
-                onChange={(e) => handleInputChange("postcode", e.target.value)}
-                placeholder="101001"
-                className="w-full px-3 py-2 border border-[#A6A0A3] rounded-lg focus:outline-none focus:ring-2 focus:ring-boostyYellow focus:border-transparent"
-              />
-            </div>
+          {/* Postcode */}
+          <div>
+            <label className="block text-sm font-semibold text-[#3D3E3E] mb-2">
+              Postal Code
+            </label>
+            <input
+              type="text"
+              value={addressData.postcode}
+              onChange={(e) => handleInputChange("postcode", e.target.value)}
+              placeholder="Enter postal code"
+              className="w-full px-3 py-2 border border-[#A6A0A3] rounded-lg focus:outline-none focus:ring-2 focus:ring-boostyYellow focus:border-transparent"
+            />
           </div>
 
           {/* Action Buttons */}
@@ -318,8 +553,8 @@ const AddressModal = ({ isOpen, onClose, onAddressUpdated, userToken }) => {
         </form>
 
         {/* Help text */}
-        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-xs text-blue-600">
+        <div className="mt-4 p-3 bg-boostyBlack border border-blue-200 rounded-lg">
+          <p className="text-xs  text-boostyYellow">
             💡 Your updated address will be used for all future solar
             recommendations and installations.
           </p>

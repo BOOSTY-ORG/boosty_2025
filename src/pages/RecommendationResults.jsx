@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useUser, useClerk } from "@clerk/clerk-react";
+import { useUser, useClerk, useAuth } from "@clerk/clerk-react";
 import { useSelector } from "react-redux";
 import { useRecommendation } from "../context/RecommendationContext";
 import { useNavigate } from "react-router-dom";
@@ -8,7 +8,8 @@ import { API_ENDPOINTS } from "../config/api";
 
 const RecommendationResults = () => {
   // Actual auth data from your Redux store and Clerk
-  const { user: clerkUser, isSignedIn, getToken } = useUser();
+  const { user: clerkUser, isSignedIn } = useUser();
+  const { getToken } = useAuth(); // Move getToken to useAuth hook
   const { openSignIn } = useClerk();
   const { user: reduxUser, isAuthenticated } = useSelector(
     (state) => state.auth
@@ -52,36 +53,14 @@ const RecommendationResults = () => {
   const loadUserAddress = async () => {
     setAddressLoading(true);
     try {
-      const token = await getUserToken();
-      if (!token) return;
-
-      const response = await fetch(API_ENDPOINTS.USER_ADDRESS, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const result = await response.json();
-
-      if (result.success && result.hasAddress) {
-        setUserAddress(result.address);
-      } else {
-        // Try to get address from recommendation result
-        const recommendationAddress =
-          recommendationResult?.locationProfile?.location;
-        if (recommendationAddress?.fullAddress) {
-          setUserAddress({
-            fullAddress: recommendationAddress.fullAddress,
-            city: recommendationAddress.city,
-            state: recommendationAddress.region,
-            country: recommendationAddress.country,
-            source: recommendationAddress.addressSource || "estimated",
-            accuracy: recommendationAddress.addressAccuracy || "approximate",
-          });
-        }
+      // Load from localStorage
+      const savedAddress = localStorage.getItem("boosty_user_address");
+      if (savedAddress) {
+        const addressData = JSON.parse(savedAddress);
+        setUserAddress(addressData);
+        console.log("✅ Address loaded from localStorage");
+        return;
       }
-    } catch (error) {
-      console.error("Failed to load user address:", error);
 
       // Fallback to recommendation location data
       const recommendationAddress =
@@ -96,29 +75,43 @@ const RecommendationResults = () => {
           accuracy: recommendationAddress.addressAccuracy || "approximate",
         });
       }
+    } catch (error) {
+      console.error("Failed to load address:", error);
     } finally {
       setAddressLoading(false);
     }
   };
 
-  // Handle case where no recommendation data
+  // Handle case where no recommendation data - but check localStorage first
   if (!hasRecommendation || !recommendationResult) {
+    // Try to load from localStorage directly as a fallback
+    const savedData = localStorage.getItem("boosty_recommendation_results");
+
+    if (savedData) {
+      try {
+        const parsedData = JSON.parse(savedData);
+        if (parsedData && parsedData.recommendation) {
+          // Force update the context with saved data
+          console.log("Found saved recommendation data, redirecting...");
+          window.location.reload(); // Force reload to reinitialize context
+          return null;
+        }
+      } catch (error) {
+        console.error("Failed to parse saved data:", error);
+      }
+    }
+
+    // Only show this if there's truly no data
     return (
       <div className="fixed inset-0 bg-yellow-400 flex items-center justify-center">
-        <div className="bg-white rounded-2xl p-6 max-w-lg text-center">
-          <h2 className="text-xl font-bold mb-4 capitalize">
-            Going back to start the recommendation process
-          </h2>
-          <p className="text-[#3D3E3E] mb-4">
-            {settings.language === "Pidgin"
-              ? "You're going back to fill the appliances form to get new recommendations"
-              : "You're going back to fill the appliances form to get new recommendations"}
-          </p>
+        <div className="rounded-2xl p-6 max-w-lg text-center">
+          <div className="w-16 h-16 border-4 border-boostyBlack border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div>No Recommendation Found</div>
           <button
             onClick={() => navigate("/voice-assistant")}
-            className="px-6 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700"
+            className="px-6 py-2 h-[48px] bg-boostyBlack text-boostyYellow rounded-lg mt-4 cursor-pointer"
           >
-            {settings.language === "Pidgin" ? "Go Back" : "Go Back"}
+            Start New Recommendation
           </button>
         </div>
       </div>
@@ -179,7 +172,7 @@ const RecommendationResults = () => {
       console.log("Navigate to financing application");
     } else {
       // Navigate to checkout/receipt
-      console.log("Navigate to receipt page");
+      navigate("/receipt")
     }
   };
 
@@ -248,7 +241,7 @@ const RecommendationResults = () => {
 
   return (
     <div className="fixed inset-0 bg-yellow-400 bg-opacity-95 flex items-center justify-center z-50 p-4">
-      {/* Tap here to talk button */}
+      {/* Tap here to talk button
       <button
         onClick={handleTapToTalk}
         className="absolute top-6 left-6 bg-[#E8F2F2] border-[2px] border-[#374646] rounded-full min-w-[220px] h-[38px] px-4 py-2 text-lg flex items-center space-x-2"
@@ -259,12 +252,12 @@ const RecommendationResults = () => {
             ? "Press here to talk"
             : "Tap here to talk"}
         </span>
-      </button>
+      </button> */}
 
-      {/* Settings icon */}
+      {/* Settings icon
       <div className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center">
         <img src="/settings.svg" alt="" />
-      </div>
+      </div> */}
 
       {/* Main recommendation card */}
       <div className="bg-white rounded-2xl p-8 w-full max-w-xl shadow-2xl max-h-[85vh] overflow-y-auto scrollbar-thin scrollbar-thumb-boostyYellow scrollbar-track-boostyYellow">
@@ -499,7 +492,7 @@ const RecommendationResults = () => {
         isOpen={showAddressModal}
         onClose={() => setShowAddressModal(false)}
         onAddressUpdated={handleAddressUpdated}
-        userToken={getUserToken}
+        getTokenFunction={getUserToken}
       />
     </div>
   );

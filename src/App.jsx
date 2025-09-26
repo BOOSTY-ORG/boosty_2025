@@ -22,6 +22,7 @@ import VoiceSettings from "./pages/VoiceSettings";
 import { RecommendationProvider } from "./context/RecommendationContext";
 import RecommendationResults from "./pages/RecommendationResults";
 import ErrorBoundary from "./components/ErrorBoundary";
+import ReceiptPage from "./pages/ReceiptPage";
 
 // Component that handles routing logic - INSIDE Router context
 const AppContent = () => {
@@ -43,7 +44,8 @@ const AppContent = () => {
     <>
       {pathname !== "/voice-assistant" &&
         pathname !== "/voice-settings" &&
-        pathname !== "/recommendation-results" && <Navbar />}
+        pathname !== "/recommendation-results" &&
+        pathname !== "/receipt" && <Navbar />}
       <ScrollToTop />
       <Routes>
         <Route path="/" element={<Homepage />} />
@@ -57,10 +59,12 @@ const AppContent = () => {
           path="/recommendation-results"
           element={<RecommendationResults />}
         />
+        <Route path="/receipt" element={<ReceiptPage />} />
       </Routes>
       {pathname !== "/voice-assistant" &&
         pathname !== "/voice-settings" &&
-        pathname !== "/recommendation-results" && <Footer />}
+        pathname !== "/recommendation-results" &&
+        pathname !== "/receipt" && <Footer />}
     </>
   );
 };
